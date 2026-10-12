@@ -1,0 +1,17 @@
+name: Whole Life
+id_prefixes: [WL]
+context: >
+  Whole life covers the insured for life and builds cash value on a guaranteed schedule.
+  Premium and guaranteed values depend on product version, issue age, face amount, payment
+  duration and mode. Non-guaranteed illustrations must be labelled as such. Policy loans are
+  limited to the available loan amount.
+glossary:
+  cash value: The savings amount built up by policy year, per a configured schedule.
+  policy loan: A loan against cash value, limited to the available loan amount.
+  modal factor: Multiplier applied when paying monthly or annually instead of the base mode.
+  paid-up option: A choice that stops premium payments with reduced cover.
+risk_tags: [guaranteed_values, loan_limit, collection_failure]
+boundary_hints:
+  - Loan equal to the available amount, and one cent above it.
+  - Minimum issue age and one day below it.
+  - A declined initial payment must not mark the policy paid.

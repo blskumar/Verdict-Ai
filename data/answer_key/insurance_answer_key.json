@@ -1,0 +1,602 @@
+[
+  {
+    "id": "HOME-TC-01-01",
+    "requirement_id": "HOME-REQ-01",
+    "type": "Positive",
+    "scenario": "Submit a complete owner-occupied application with year built 2005 and roof year 2020.",
+    "expected": "Application advances to eligibility and all entered values are retained.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-01-02",
+    "requirement_id": "HOME-REQ-01",
+    "type": "Negative",
+    "scenario": "Omit property address and submit.",
+    "expected": "Submission is blocked and property address is flagged as required.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-01-03",
+    "requirement_id": "HOME-REQ-01",
+    "type": "Boundary",
+    "scenario": "Enter year built as 1849 when configured minimum is 1850.",
+    "expected": "Validation fails and no quote is created.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-02-01",
+    "requirement_id": "HOME-REQ-02",
+    "type": "Positive",
+    "scenario": "Submit an eligible owner-occupied home in a supported state and eligible protection class.",
+    "expected": "Eligibility passes to rating.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-02-02",
+    "requirement_id": "HOME-REQ-02",
+    "type": "Negative",
+    "scenario": "Submit a property in a state absent from the configured supported-state list.",
+    "expected": "Quote is blocked with the configured unsupported-state reason code.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-02-03",
+    "requirement_id": "HOME-REQ-02",
+    "type": "Boundary",
+    "scenario": "Submit a property exactly at the configured maximum eligible age.",
+    "expected": "Configured inclusive/exclusive boundary rule is applied and recorded.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-03-01",
+    "requirement_id": "HOME-REQ-03",
+    "type": "Positive",
+    "scenario": "Select dwelling limit $300,000 and $1,000 deductible from configured options.",
+    "expected": "Selections are saved and shown on the quote.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-03-02",
+    "requirement_id": "HOME-REQ-03",
+    "type": "Negative",
+    "scenario": "Enter dwelling limit $275,000 when only $250,000 and $300,000 are configured.",
+    "expected": "Invalid limit is rejected with a field-level message.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-03-03",
+    "requirement_id": "HOME-REQ-03",
+    "type": "Negative",
+    "scenario": "Submit a deductible of $2,500 when the configured maximum is $2,000.",
+    "expected": "Submission is blocked and no quote is saved.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-04-01",
+    "requirement_id": "HOME-REQ-04",
+    "type": "Calculation",
+    "scenario": "Use controlled factors whose expected term premium is $1,250.00 before tax/fees.",
+    "expected": "Term premium displays as $1,250.00; configured taxes and fees are separate line items.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-04-02",
+    "requirement_id": "HOME-REQ-04",
+    "type": "Boundary",
+    "scenario": "Set quote start date to the effective date of rating version V2.",
+    "expected": "V2 is used for the quote.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-04-03",
+    "requirement_id": "HOME-REQ-04",
+    "type": "Positive",
+    "scenario": "Rate identical inputs twice with the same rating version.",
+    "expected": "Both calculations return identical premium and line items.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-05-01",
+    "requirement_id": "HOME-REQ-05",
+    "type": "Positive",
+    "scenario": "Bind a valid quote with terms accepted and payment method confirmed.",
+    "expected": "Unique policy number is created and issued coverages match the quote.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-05-02",
+    "requirement_id": "HOME-REQ-05",
+    "type": "Negative",
+    "scenario": "Attempt to bind an expired quote.",
+    "expected": "Binding is blocked and recalculation is required.",
+    "source": "answer_key"
+  },
+  {
+    "id": "HOME-TC-05-03",
+    "requirement_id": "HOME-REQ-05",
+    "type": "Negative",
+    "scenario": "Register a loss dated one day before policy effective date.",
+    "expected": "FNOL registration is blocked with policy-not-in-force reason code.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-01-01",
+    "requirement_id": "CA-REQ-01",
+    "type": "Positive",
+    "scenario": "Submit a commercial vehicle with all required business and vehicle details.",
+    "expected": "Application advances and vehicle is linked to the business.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-01-02",
+    "requirement_id": "CA-REQ-01",
+    "type": "Negative",
+    "scenario": "Omit legal business name.",
+    "expected": "Submission is blocked and the missing field is identified.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-01-03",
+    "requirement_id": "CA-REQ-01",
+    "type": "Boundary",
+    "scenario": "Enter a 16-character VIN.",
+    "expected": "VIN validation fails and no quote is created.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-02-01",
+    "requirement_id": "CA-REQ-02",
+    "type": "Positive",
+    "scenario": "Submit an eligible business with two eligible vehicles.",
+    "expected": "Risk proceeds to rating.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-02-02",
+    "requirement_id": "CA-REQ-02",
+    "type": "Negative",
+    "scenario": "Submit a business class on the configured prohibited list.",
+    "expected": "Quote is blocked with the configured reason code.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-02-03",
+    "requirement_id": "CA-REQ-02",
+    "type": "Boundary",
+    "scenario": "Submit a fleet one vehicle above the auto-quote threshold.",
+    "expected": "Application is routed to configured fleet underwriting/referral rather than rated as standard risk.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-03-01",
+    "requirement_id": "CA-REQ-03",
+    "type": "Positive",
+    "scenario": "Select $1,000,000 combined single limit and collision with $1,000 deductible.",
+    "expected": "Selections are saved exactly.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-03-02",
+    "requirement_id": "CA-REQ-03",
+    "type": "Negative",
+    "scenario": "Enter a liability limit absent from configured options.",
+    "expected": "Invalid limit is rejected.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-03-03",
+    "requirement_id": "CA-REQ-03",
+    "type": "Negative",
+    "scenario": "Submit comprehensive deductible while comprehensive is not selected.",
+    "expected": "Request is rejected and no deductible is stored for that coverage.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-04-01",
+    "requirement_id": "CA-REQ-04",
+    "type": "Calculation",
+    "scenario": "Use controlled rating data with expected term premium $4,800.00 before taxes/fees.",
+    "expected": "Premium is $4,800.00 and taxes/fees are separate.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-04-02",
+    "requirement_id": "CA-REQ-04",
+    "type": "Calculation",
+    "scenario": "Apply 7% fleet credit to eligible premium of $5,000.00.",
+    "expected": "Credit equals $350.00 and appears once.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-04-03",
+    "requirement_id": "CA-REQ-04",
+    "type": "Negative",
+    "scenario": "Submit duplicate fleet-credit indicators.",
+    "expected": "Credit is applied no more than once.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-05-01",
+    "requirement_id": "CA-REQ-05",
+    "type": "Positive",
+    "scenario": "Bind a valid fleet quote and compare vehicles on issued policy with quote.",
+    "expected": "Policy and insured vehicles match quote.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-05-02",
+    "requirement_id": "CA-REQ-05",
+    "type": "Boundary",
+    "scenario": "Add a vehicle effective halfway through the policy term.",
+    "expected": "A separate endorsement reference and prorated additional premium are recorded.",
+    "source": "answer_key"
+  },
+  {
+    "id": "CA-TC-05-03",
+    "requirement_id": "CA-REQ-05",
+    "type": "Negative",
+    "scenario": "Repeat bind request with the same idempotency key.",
+    "expected": "No duplicate policy is created.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-01-01",
+    "requirement_id": "TERM-REQ-01",
+    "type": "Positive",
+    "scenario": "Submit complete application for $500,000 face amount and 20-year term.",
+    "expected": "Application is saved and advances to underwriting.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-01-02",
+    "requirement_id": "TERM-REQ-01",
+    "type": "Negative",
+    "scenario": "Omit a required beneficiary allocation.",
+    "expected": "Submission is blocked and beneficiary details are flagged.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-01-03",
+    "requirement_id": "TERM-REQ-01",
+    "type": "Boundary",
+    "scenario": "Select a term length not present in configured product options.",
+    "expected": "Invalid term is rejected.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-02-01",
+    "requirement_id": "TERM-REQ-02",
+    "type": "Positive",
+    "scenario": "Submit applicant within configured age and face-amount limits with acceptable answers.",
+    "expected": "Application receives configured eligible/next-step status.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-02-02",
+    "requirement_id": "TERM-REQ-02",
+    "type": "Negative",
+    "scenario": "Submit residence state not supported for this product.",
+    "expected": "Application is blocked with unsupported-residency reason.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-02-03",
+    "requirement_id": "TERM-REQ-02",
+    "type": "Boundary",
+    "scenario": "Answer Yes to a configured mandatory medical referral question.",
+    "expected": "Application is referred to manual underwriting and not auto-approved.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-03-01",
+    "requirement_id": "TERM-REQ-03",
+    "type": "Calculation",
+    "scenario": "Use controlled rate data specifying monthly premium $42.50 for the test profile.",
+    "expected": "Monthly premium displays as $42.50 and payment mode is clear.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-03-02",
+    "requirement_id": "TERM-REQ-03",
+    "type": "Boundary",
+    "scenario": "Start policy on the effective date of a new rating version.",
+    "expected": "The newly effective version is used.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-03-03",
+    "requirement_id": "TERM-REQ-03",
+    "type": "Positive",
+    "scenario": "Recalculate unchanged inputs using the same version.",
+    "expected": "Premium and fees are identical.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-04-01",
+    "requirement_id": "TERM-REQ-04",
+    "type": "Positive",
+    "scenario": "Enter two primary beneficiaries with allocations of 60% and 40%.",
+    "expected": "Application accepts allocations totalling 100%.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-04-02",
+    "requirement_id": "TERM-REQ-04",
+    "type": "Negative",
+    "scenario": "Enter allocations totalling 90%.",
+    "expected": "Submission is blocked with allocation-total error.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-04-03",
+    "requirement_id": "TERM-REQ-04",
+    "type": "Boundary",
+    "scenario": "Enter allocations totalling 100.01%.",
+    "expected": "Submission is blocked; total must equal 100%.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-05-01",
+    "requirement_id": "TERM-REQ-05",
+    "type": "Positive",
+    "scenario": "Issue approved application after acceptance and payment confirmation.",
+    "expected": "Unique policy number is created and policy details match accepted terms.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-05-02",
+    "requirement_id": "TERM-REQ-05",
+    "type": "Negative",
+    "scenario": "Attempt issue while underwriting status is Pending.",
+    "expected": "Issue is blocked.",
+    "source": "answer_key"
+  },
+  {
+    "id": "TERM-TC-05-03",
+    "requirement_id": "TERM-REQ-05",
+    "type": "Boundary",
+    "scenario": "Request cancellation on the last day of the configured 30-day free-look period.",
+    "expected": "Free-look cancellation is accepted and configured refund/status is recorded.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-01-01",
+    "requirement_id": "WL-REQ-01",
+    "type": "Positive",
+    "scenario": "Submit valid whole-life application with monthly mode and configured payment duration.",
+    "expected": "Application advances with funding choices retained.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-01-02",
+    "requirement_id": "WL-REQ-01",
+    "type": "Negative",
+    "scenario": "Omit required payment duration.",
+    "expected": "Submission is blocked and missing duration is identified.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-01-03",
+    "requirement_id": "WL-REQ-01",
+    "type": "Negative",
+    "scenario": "Select a paid-up option unavailable for the chosen product variant.",
+    "expected": "Option is rejected and not persisted.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-02-01",
+    "requirement_id": "WL-REQ-02",
+    "type": "Boundary",
+    "scenario": "Submit at the configured minimum issue age.",
+    "expected": "Minimum-age boundary follows the configured inclusive rule.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-02-02",
+    "requirement_id": "WL-REQ-02",
+    "type": "Negative",
+    "scenario": "Submit one day below the minimum issue age.",
+    "expected": "Application is blocked or referred per configured lower-bound rule.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-02-03",
+    "requirement_id": "WL-REQ-02",
+    "type": "Negative",
+    "scenario": "Submit a prohibited residence state.",
+    "expected": "Application is blocked with configured reason code.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-03-01",
+    "requirement_id": "WL-REQ-03",
+    "type": "Calculation",
+    "scenario": "Use controlled table specifying monthly premium $125.00 for test profile.",
+    "expected": "Monthly premium equals $125.00; guaranteed values are labelled.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-03-02",
+    "requirement_id": "WL-REQ-03",
+    "type": "Calculation",
+    "scenario": "Switch monthly to annual premium mode.",
+    "expected": "Annual premium uses the configured modal factor.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-03-03",
+    "requirement_id": "WL-REQ-03",
+    "type": "Positive",
+    "scenario": "Recalculate identical inputs with same product version.",
+    "expected": "Premium and guaranteed values are identical.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-04-01",
+    "requirement_id": "WL-REQ-04",
+    "type": "Positive",
+    "scenario": "Retrieve configured guaranteed cash value for policy year 5.",
+    "expected": "Displayed value matches the configured schedule.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-04-02",
+    "requirement_id": "WL-REQ-04",
+    "type": "Boundary",
+    "scenario": "Request loan equal to available loan amount.",
+    "expected": "Request passes limit validation and transaction is recorded.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-04-03",
+    "requirement_id": "WL-REQ-04",
+    "type": "Negative",
+    "scenario": "Request loan one cent above available amount.",
+    "expected": "Request is blocked and no loan transaction is created.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-05-01",
+    "requirement_id": "WL-REQ-05",
+    "type": "Positive",
+    "scenario": "Issue approved application with terms accepted and payment confirmed.",
+    "expected": "Policy number is created and details match accepted application.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-05-02",
+    "requirement_id": "WL-REQ-05",
+    "type": "Negative",
+    "scenario": "Attempt issue with outstanding underwriting requirements.",
+    "expected": "Issue is blocked.",
+    "source": "answer_key"
+  },
+  {
+    "id": "WL-TC-05-03",
+    "requirement_id": "WL-REQ-05",
+    "type": "Negative",
+    "scenario": "Simulate declined initial premium payment.",
+    "expected": "Policy is not marked paid; payment failure and configured collection status are recorded.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-01-01",
+    "requirement_id": "LIFE-REQ-01",
+    "type": "Positive",
+    "scenario": "Create and save a complete application.",
+    "expected": "Unique application reference and configured initial status are created.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-01-02",
+    "requirement_id": "LIFE-REQ-01",
+    "type": "Positive",
+    "scenario": "Retrieve application by its reference.",
+    "expected": "Correct application and audit history are returned.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-01-03",
+    "requirement_id": "LIFE-REQ-01",
+    "type": "Negative",
+    "scenario": "Search using an unknown application reference.",
+    "expected": "Not-found response is returned without exposing another applicant's data.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-02-01",
+    "requirement_id": "LIFE-REQ-02",
+    "type": "Positive",
+    "scenario": "Complete all required disclosures and record required evidence.",
+    "expected": "Application proceeds to underwriting decision.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-02-02",
+    "requirement_id": "LIFE-REQ-02",
+    "type": "Negative",
+    "scenario": "Leave one mandatory disclosure unanswered.",
+    "expected": "Submission is blocked or status remains Incomplete.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-02-03",
+    "requirement_id": "LIFE-REQ-02",
+    "type": "Negative",
+    "scenario": "Mark required medical report outstanding and attempt approval.",
+    "expected": "Approval is blocked and status remains Pending Evidence.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-03-01",
+    "requirement_id": "LIFE-REQ-03",
+    "type": "Positive",
+    "scenario": "Record Approve decision for a complete eligible application.",
+    "expected": "Status becomes Approved and issue eligibility is enabled.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-03-02",
+    "requirement_id": "LIFE-REQ-03",
+    "type": "Negative",
+    "scenario": "Record Decline with configured reason code.",
+    "expected": "Status becomes Declined and reason is retained.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-03-03",
+    "requirement_id": "LIFE-REQ-03",
+    "type": "Negative",
+    "scenario": "Trigger referral rule and attempt policy issue before review completion.",
+    "expected": "Issue is blocked while status remains Referred/Pending Review.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-04-01",
+    "requirement_id": "LIFE-REQ-04",
+    "type": "Positive",
+    "scenario": "Generate issued policy documents and compare face amount, premium, term and beneficiaries.",
+    "expected": "Documents match issued policy data.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-04-02",
+    "requirement_id": "LIFE-REQ-04",
+    "type": "Negative",
+    "scenario": "Attempt protected policy-field update as unauthorised user.",
+    "expected": "Update is rejected and data remains unchanged.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-04-03",
+    "requirement_id": "LIFE-REQ-04",
+    "type": "Positive",
+    "scenario": "Review audit history after a valid policy change.",
+    "expected": "Audit shows actor, timestamp and changed fields as configured.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-05-01",
+    "requirement_id": "LIFE-REQ-05",
+    "type": "Positive",
+    "scenario": "Change beneficiaries to allocations totalling 100%.",
+    "expected": "Change is saved with effective date and audit trail.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-05-02",
+    "requirement_id": "LIFE-REQ-05",
+    "type": "Negative",
+    "scenario": "Submit beneficiary changes totalling 95%.",
+    "expected": "Change is blocked until allocation totals 100%.",
+    "source": "answer_key"
+  },
+  {
+    "id": "LIFE-TC-05-03",
+    "requirement_id": "LIFE-REQ-05",
+    "type": "Boundary",
+    "scenario": "Register death notice dated before policy effective date.",
+    "expected": "Notice is blocked or referred according to configured in-force rule with reason recorded.",
+    "source": "answer_key"
+  }
+]

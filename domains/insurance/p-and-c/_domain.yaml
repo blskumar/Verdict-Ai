@@ -1,0 +1,18 @@
+name: Property and Casualty
+description: Property and casualty insurance such as homeowners and commercial auto.
+context: >
+  P&C policies are rated per risk (a property or a vehicle) using the rating version in force on
+  the requested start date. Binding turns an accepted quote into a policy. A loss can only be
+  registered (first notice of loss, FNOL) if the policy was in force on the loss date.
+glossary:
+  FNOL: First notice of loss, the first report of a claim event.
+  bind: Turn an accepted, paid quote into an in-force policy.
+  quote: A priced offer valid for a limited time.
+  deductible: The amount the insured pays before coverage applies.
+  rating version: The set of rating factors in force for a date range.
+risk_tags: [rating, binding, loss_registration]
+boundary_hints:
+  - Quote expiry day and the day before or after the policy effective date.
+  - Prorated amounts for mid-term changes.
+thresholds:
+  similarity: 0.85

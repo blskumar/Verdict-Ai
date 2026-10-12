@@ -1,0 +1,202 @@
+[
+  {
+    "id": "HOME-REQ-01",
+    "title": "Capture property and applicant details",
+    "text": "Capture applicant, property address, occupancy, year built, roof year, construction type and effective date; validate mandatory fields and configured year ranges.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/homeowners",
+    "risk": null
+  },
+  {
+    "id": "HOME-REQ-02",
+    "title": "Validate property eligibility",
+    "text": "Apply configured supported-state, occupancy, property-age and protection-class rules; refer risks that require manual review.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/homeowners",
+    "risk": null
+  },
+  {
+    "id": "HOME-REQ-03",
+    "title": "Select dwelling coverage and deductible",
+    "text": "Support configured dwelling, other structures, personal property, loss of use, liability and medical payments limits; validate deductibles against configured options.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/homeowners",
+    "risk": null
+  },
+  {
+    "id": "HOME-REQ-04",
+    "title": "Calculate property premium and discounts",
+    "text": "Use the rating version effective on the requested start date and configured territory, construction, protection, coverage and deductible factors; show discounts, taxes and fees separately.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/homeowners",
+    "risk": null
+  },
+  {
+    "id": "HOME-REQ-05",
+    "title": "Bind policy and register property loss",
+    "text": "Permit binding only for a valid quote with terms accepted and payment confirmed; accept loss notice only when policy is in force on loss date.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/homeowners",
+    "risk": null
+  },
+  {
+    "id": "CA-REQ-01",
+    "title": "Capture business and fleet details",
+    "text": "Capture legal business name, business identifier, garaging state, VIN, model year, vehicle type, stated value, mileage band and vehicle use.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/commercial-auto",
+    "risk": null
+  },
+  {
+    "id": "CA-REQ-02",
+    "title": "Validate commercial risk eligibility",
+    "text": "Apply configured business-class, vehicle-class, garaging-state and fleet-size rules; distinguish referral from hard decline.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/commercial-auto",
+    "risk": null
+  },
+  {
+    "id": "CA-REQ-03",
+    "title": "Select commercial auto coverages",
+    "text": "Support configured liability limits, comprehensive, collision and hired/non-owned auto options; validate deductible applicability.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/commercial-auto",
+    "risk": null
+  },
+  {
+    "id": "CA-REQ-04",
+    "title": "Rate fleet and apply credits",
+    "text": "Use effective rating version and configured business, vehicle, territory, mileage, driver and coverage factors; itemise fleet credits/surcharges.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/commercial-auto",
+    "risk": null
+  },
+  {
+    "id": "CA-REQ-05",
+    "title": "Issue policy and endorse a vehicle",
+    "text": "Create a unique policy on binding; vehicle additions/removals create auditable transactions and prorated premium changes.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/p-and-c/commercial-auto",
+    "risk": null
+  },
+  {
+    "id": "TERM-REQ-01",
+    "title": "Capture term-life application",
+    "text": "Capture insured identity, DOB, residence state, smoker status, face amount, term length, beneficiary allocations and requested effective date.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/term",
+    "risk": null
+  },
+  {
+    "id": "TERM-REQ-02",
+    "title": "Apply life underwriting eligibility",
+    "text": "Evaluate configured age, face amount, residency and underwriting questions; refer cases outside automatic-decision limits.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/term",
+    "risk": null
+  },
+  {
+    "id": "TERM-REQ-03",
+    "title": "Calculate term premium",
+    "text": "Use approved rate table effective on policy start date and configured age, smoker class, face amount, term and underwriting class.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/term",
+    "risk": null
+  },
+  {
+    "id": "TERM-REQ-04",
+    "title": "Validate beneficiaries",
+    "text": "Require valid beneficiary details and allocations totalling exactly 100%; prevent incomplete allocation from proceeding.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/term",
+    "risk": null
+  },
+  {
+    "id": "TERM-REQ-05",
+    "title": "Issue policy and handle free-look",
+    "text": "Issue only after approval, acceptance and initial-payment confirmation; apply configured free-look cancellation and refund rules.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/term",
+    "risk": null
+  },
+  {
+    "id": "WL-REQ-01",
+    "title": "Capture whole-life funding choices",
+    "text": "Capture insured details, face amount, premium mode, payment duration, beneficiaries and configured paid-up/additional-benefit options.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/whole-life",
+    "risk": null
+  },
+  {
+    "id": "WL-REQ-02",
+    "title": "Validate whole-life issue eligibility",
+    "text": "Apply configured issue-age, residence, face-amount and underwriting-class rules.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/whole-life",
+    "risk": null
+  },
+  {
+    "id": "WL-REQ-03",
+    "title": "Calculate premium and guaranteed values",
+    "text": "Calculate premium and guaranteed values using product version, issue age, face amount, payment duration and premium mode; label non-guaranteed illustrations separately.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/whole-life",
+    "risk": null
+  },
+  {
+    "id": "WL-REQ-04",
+    "title": "Validate cash value and policy loans",
+    "text": "Display cash value from configured policy-year schedule; enforce loan-available limit and eligible policy status.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/whole-life",
+    "risk": null
+  },
+  {
+    "id": "WL-REQ-05",
+    "title": "Issue policy and collect premium",
+    "text": "Require completed underwriting, accepted terms and initial-payment confirmation; record failed collection accurately.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/whole-life",
+    "risk": null
+  },
+  {
+    "id": "LIFE-REQ-01",
+    "title": "Create and track application",
+    "text": "Create unique application reference with insured identity, product, status, timestamp and audit history.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/common",
+    "risk": null
+  },
+  {
+    "id": "LIFE-REQ-02",
+    "title": "Validate disclosures and evidence",
+    "text": "Require mandatory disclosures and configured underwriting evidence before underwriting approval.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/common",
+    "risk": null
+  },
+  {
+    "id": "LIFE-REQ-03",
+    "title": "Manage underwriting decisions",
+    "text": "Support configured approve, decline and refer decisions; referral must block issue until review is resolved.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/common",
+    "risk": null
+  },
+  {
+    "id": "LIFE-REQ-04",
+    "title": "Generate documents and audit changes",
+    "text": "Policy documents must match issued policy values; material servicing changes must retain actor, timestamp and changed fields.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/common",
+    "risk": null
+  },
+  {
+    "id": "LIFE-REQ-05",
+    "title": "Change beneficiaries and register claim notice",
+    "text": "Validate beneficiary allocations; death claim notification must reference an existing policy and capture event/reporter details without implying approval.",
+    "acceptance_criteria": "required inputs and configured rules are validated; invalid/ineligible requests are blocked or referred with a reason/status; successful transactions preserve values and create expected references/status/audit data.",
+    "domain": "insurance/life/common",
+    "risk": null
+  }
+]
