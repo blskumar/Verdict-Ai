@@ -71,6 +71,8 @@ class RequirementAnalysis:
     testability_score: float  # 0.0 to 1.0
     testability_verdict: Literal["testable", "needs_review", "untestable"]
     risk: Literal["high", "medium", "low"]
+    risk_score: float = 0.5  # 0.0 to 1.0
+    priority: str = "P1 (Medium)"  # P0 (High), P1 (Medium), P2 (Low)
     issues: list[RequirementIssue] = field(default_factory=list)
     suggested_scenarios: list[dict[str, str]] = field(default_factory=list)
     summary: str = ""
@@ -147,7 +149,7 @@ def analyze_requirement(
         )
         base_score -= 0.10
 
-    # 5. Evaluate Risk
+    # 5. Evaluate Risk & Derive Numeric Risk Score and Priority
     if req.risk in ("high", "medium", "low"):
         risk = req.risk
     elif HIGH_RISK_TERMS.search(combined_text):
@@ -156,6 +158,21 @@ def analyze_requirement(
         risk = "high"
     else:
         risk = "medium"
+
+    # Base risk score: High=0.85, Medium=0.50, Low=0.20
+    base_risk_score = 0.85 if risk == "high" else (0.50 if risk == "medium" else 0.20)
+    # Critical defects or ambiguities increase operational risk
+    if any(i.severity == "error" for i in issues):
+        base_risk_score = min(1.0, base_risk_score + 0.10)
+    risk_score = round(base_risk_score, 2)
+
+    # Priority mapped strictly from risk score
+    if risk == "high" or risk_score >= 0.75:
+        priority = "P0 (High)"
+    elif risk == "medium" or risk_score >= 0.45:
+        priority = "P1 (Medium)"
+    else:
+        priority = "P2 (Low)"
 
     # 6. Incorporate model agent findings if available
     if model_check:
@@ -193,6 +210,8 @@ def analyze_requirement(
         testability_score=final_score,
         testability_verdict=verdict,
         risk=risk,
+        risk_score=risk_score,
+        priority=priority,
         issues=issues,
         suggested_scenarios=scenarios,
         summary=summary,
@@ -260,6 +279,8 @@ def requirements_review_to_csv(analyses: list[RequirementAnalysis], reqs: list[R
         "requirement_id",
         "title",
         "risk",
+        "risk_score",
+        "priority",
         "testability_score",
         "testability_verdict",
         "quality_issues_count",
@@ -280,6 +301,8 @@ def requirements_review_to_csv(analyses: list[RequirementAnalysis], reqs: list[R
             a.req_id,
             a.title,
             a.risk,
+            f"{a.risk_score:.2f}",
+            a.priority,
             f"{a.testability_score:.2f}",
             a.testability_verdict,
             len(a.issues),
@@ -319,7 +342,7 @@ def requirements_review_to_markdown(analyses: list[RequirementAnalysis], reqs: l
         r = req_map.get(a.req_id)
         verdict_icon = "✅" if a.testability_verdict == "testable" else ("⚠️" if a.testability_verdict == "needs_review" else "❌")
         lines.append(f"### {verdict_icon} {a.req_id}: {a.title}")
-        lines.append(f"- **Verdict:** `{a.testability_verdict.upper()}` ({round(a.testability_score * 100)}% quality score) | **Risk:** `{a.risk.upper()}`")
+        lines.append(f"- **Verdict:** `{a.testability_verdict.upper()}` ({round(a.testability_score * 100)}% quality score) | **Risk:** `{a.risk.upper()}` (Score: {a.risk_score:.2f}) | **Priority:** `{a.priority}`")
         if r and r.text:
             lines.append(f"- **Specification:** {r.text}")
         if r and r.acceptance_criteria:
@@ -350,11 +373,13 @@ def requirements_review_to_html(analyses: list[RequirementAnalysis], reqs: list[
     for a in analyses:
         r = req_map.get(a.req_id)
         badge_cls = "badge-approve" if a.testability_verdict == "testable" else ("badge-revise" if a.testability_verdict == "needs_review" else "badge-reject")
+        priority_cls = "badge-p0" if "P0" in a.priority else ("badge-p1" if "P1" in a.priority else "badge-p2")
         issues_list = "".join(f"<li><strong>[{html.escape(i.code)}]</strong> {html.escape(i.message)}<br><small style='color:#555'>Fix: {html.escape(i.suggestion)}</small></li>" for i in a.issues) if a.issues else "<em>No issues. Clear specification.</em>"
         scenarios_list = "".join(f"<li><code>{html.escape(s['type'])}</code>: {html.escape(s['scenario'])}</li>" for s in a.suggested_scenarios) if a.suggested_scenarios else "—"
         rows_html += f"""
         <tr>
-          <td><strong>{html.escape(a.req_id)}</strong><br><small>{html.escape(a.risk.upper())}</small></td>
+          <td><strong>{html.escape(a.req_id)}</strong><br><small>{html.escape(a.risk.upper())} ({a.risk_score:.2f})</small></td>
+          <td><span class="badge {priority_cls}">{html.escape(a.priority)}</span></td>
           <td>{html.escape(a.title)}<br><small style='color:#666'>{html.escape((r.text if r else ''))}</small></td>
           <td><span class="badge {badge_cls}">{html.escape(a.testability_verdict)}</span><br><small>{round(a.testability_score * 100)}%</small></td>
           <td><ul style='padding-left:16px;margin:0'>{issues_list}</ul></td>
@@ -376,6 +401,9 @@ def requirements_review_to_html(analyses: list[RequirementAnalysis], reqs: list[
     .badge-approve {{ background: #d3f9d8; color: #2b8a3e; }}
     .badge-revise {{ background: #fff3bf; color: #7c5800; }}
     .badge-reject {{ background: #ffe3e3; color: #c92a2a; }}
+    .badge-p0 {{ background: #ffe3e3; color: #c92a2a; }}
+    .badge-p1 {{ background: #fff3bf; color: #7c5800; }}
+    .badge-p2 {{ background: #e7f5ff; color: #1c7ed6; }}
   </style>
 </head>
 <body>
@@ -383,7 +411,7 @@ def requirements_review_to_html(analyses: list[RequirementAnalysis], reqs: list[
   <p style="color:#666;font-size:0.9rem">Review report for loaded requirements with quality scores, ambiguities flagged, and remediation suggestions.</p>
   <table>
     <thead><tr>
-      <th>ID / Risk</th><th>Requirement Statement</th><th>Testability</th><th>Flagged Ambiguities & Remediation</th><th>Recommended Test Scenarios</th>
+      <th>ID / Risk (Score)</th><th>Priority</th><th>Requirement Statement</th><th>Testability</th><th>Flagged Ambiguities & Remediation</th><th>Recommended Test Scenarios</th>
     </tr></thead>
     <tbody>{rows_html}</tbody>
   </table>

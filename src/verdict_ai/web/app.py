@@ -887,6 +887,8 @@ def create_app() -> FastAPI:
                     testability_score=float(a.get("testability_score", 1.0)),
                     testability_verdict=a.get("testability_verdict", "testable"),
                     risk=a.get("risk", "medium"),
+                    risk_score=float(a.get("risk_score", 0.85 if a.get("risk") == "high" else (0.20 if a.get("risk") == "low" else 0.50))),
+                    priority=str(a.get("priority", "P0 (High)" if a.get("risk") == "high" else ("P2 (Low)" if a.get("risk") == "low" else "P1 (Medium)"))),
                     issues=issues,
                     suggested_scenarios=a.get("suggested_scenarios", []),
                     summary=a.get("summary", ""),
