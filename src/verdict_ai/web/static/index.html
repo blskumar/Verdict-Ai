@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verdict AI — Test Case Gatekeeper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS Play CDN with custom theme config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            border: "hsl(var(--border))",
+            input: "hsl(var(--input))",
+            ring: "hsl(var(--ring))",
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            primary: {
+              DEFAULT: "hsl(var(--primary))",
+              foreground: "hsl(var(--primary-foreground))",
+            },
+            secondary: {
+              DEFAULT: "hsl(var(--secondary))",
+              foreground: "hsl(var(--secondary-foreground))",
+            },
+            muted: {
+              DEFAULT: "hsl(var(--muted))",
+              foreground: "hsl(var(--muted-foreground))",
+            },
+            accent: {
+              DEFAULT: "hsl(var(--accent))",
+              foreground: "hsl(var(--accent-foreground))",
+            },
+            card: {
+              DEFAULT: "hsl(var(--card))",
+              foreground: "hsl(var(--card-foreground))",
+            },
+          },
+          borderRadius: {
+            lg: "var(--radius)",
+            md: "calc(var(--radius) - 2px)",
+            sm: "calc(var(--radius) - 4px)",
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --background: 210 20% 98%;
+      --foreground: 224 71% 4%;
+      --card: 0 0% 100%;
+      --card-foreground: 224 71% 4%;
+      --popover: 0 0% 100%;
+      --popover-foreground: 224 71% 4%;
+      --primary: 243 75% 59%;
+      --primary-foreground: 210 20% 98%;
+      --secondary: 220 14% 96%;
+      --secondary-foreground: 220 9% 46%;
+      --muted: 220 14% 96%;
+      --muted-foreground: 220 9% 46%;
+      --accent: 220 14% 96%;
+      --accent-foreground: 220 9% 46%;
+      --border: 220 13% 91%;
+      --input: 220 13% 91%;
+      --ring: 243 75% 59%;
+      --radius: 0.65rem;
+    }
+
+    .dark {
+      --background: 224 71% 4%;
+      --foreground: 210 20% 98%;
+      --card: 224 71% 6%;
+      --card-foreground: 210 20% 98%;
+      --popover: 224 71% 6%;
+      --popover-foreground: 210 20% 98%;
+      --primary: 243 75% 63%;
+      --primary-foreground: 210 20% 98%;
+      --secondary: 215 28% 12%;
+      --secondary-foreground: 210 20% 98%;
+      --muted: 215 28% 12%;
+      --muted-foreground: 217.9 10.6% 64.9%;
+      --accent: 215 28% 12%;
+      --accent-foreground: 210 20% 98%;
+      --border: 215 28% 15%;
+      --input: 215 28% 15%;
+      --ring: 243 75% 63%;
+    }
+
+    body {
+      background-color: hsl(var(--background));
+      color: hsl(var(--foreground));
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.25); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+  </style>
+</head>
+<body class="min-h-screen antialiased flex flex-col font-sans transition-colors duration-200">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 w-full border-b border-border/70 bg-background/85 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo / Title -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+          <!-- Light / Dark mark -->
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-lg font-bold tracking-tight text-foreground">Verdict<span class="text-indigo-600 dark:text-indigo-400">AI</span></span>
+            <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">Gate Engine v0.1</span>
+          </div>
+          <p class="text-xs text-muted-foreground hidden sm:block">Automated test case gatekeeper & quality rating</p>
+        </div>
+      </div>
+
+      <!-- Header Controls: Theme Toggle & Links -->
+      <div class="flex items-center gap-3">
+        <a href="/docs" target="_blank" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+          <span>Swagger API</span>
+        </a>
+
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle" onclick="toggleTheme()" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring" title="Toggle Theme (Light / Dark)">
+          <i id="themeIconSun" data-lucide="sun" class="w-4 h-4 hidden"></i>
+          <i id="themeIconMoon" data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Top Action & Configuration Card -->
+    <div class="p-5 rounded-xl border border-border bg-card shadow-sm space-y-5">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        
+        <!-- Domain Selector & Model Mode -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 flex-1">
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Domain Pack</label>
+            <div class="relative">
+              <select id="domainSelect" class="w-full text-xs font-medium rounded-lg border border-input bg-background text-foreground px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="insurance/life/term">Insurance / Life / Term</option>
+                <option value="insurance/health/inpatient">Insurance / Health / Inpatient</option>
+                <option value="banking/credit_card/dispute">Banking / Credit Card / Dispute</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Execution Engine</label>
+            <select id="agentModeSelect" class="w-full text-xs font-medium rounded-lg border border-input bg-background text-foreground px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="mock" selected>Fast Engine (Mock Multi-Agent Router)</option>
+              <option value="live">Live LLM Router (OpenRouter API)</option>
+            </select>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Approval Threshold</label>
+              <span id="threshDisplay" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">85%</span>
+            </div>
+            <input type="range" id="threshSlider" min="0.5" max="0.95" step="0.05" value="0.85" 
+                   oninput="document.getElementById('threshDisplay').textContent = Math.round(this.value * 100) + '%'"
+                   class="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-indigo-600">
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
+          <button onclick="loadSampleData()" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-500"></i>
+            <span>Load Sample Data</span>
+          </button>
+
+          <label class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-all cursor-pointer shadow-sm">
+            <i data-lucide="upload-cloud" class="w-3.5 h-3.5 text-blue-500"></i>
+            <span>Upload Files</span>
+            <input type="file" id="fileUploadInput" multiple accept=".json,.csv,.pdf,.docx,.xlsx" class="hidden" onchange="handleFileUpload(event)">
+          </label>
+
+          <button id="runBtn" onclick="runEvaluation()" class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md shadow-indigo-600/20 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+            <span>Run Verdict Gate</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inputs Workspace: Requirements & Test Cases Tabs -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Requirements Card -->
+      <div class="p-5 rounded-xl border border-border bg-card shadow-sm flex flex-col h-[400px]">
+        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-border/70 mb-3 gap-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-indigo-500"></i>
+            <h2 class="text-sm font-bold text-foreground">Requirements Specification</h2>
+            <span id="reqCountBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted text-muted-foreground">0 loaded</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="openPasteModal()" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm" title="Paste Raw Text / User Stories">
+              <i data-lucide="clipboard-paste" class="w-3 h-3 text-sky-500"></i>
+              <span>Paste</span>
+            </button>
+            <button id="analyzeReqsBtn" onclick="analyzeRequirementsAction()" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded border border-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-all shadow-sm" title="Analyze Requirement Quality, Testability & Ambiguities">
+              <i data-lucide="sparkles" class="w-3 h-3 text-indigo-500"></i>
+              <span>Analyze</span>
+            </button>
+            <button id="generateCasesBtn" onclick="generateTestCasesAction()" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 transition-all shadow-sm" title="Synthesize Candidate Test Cases with AI">
+              <i data-lucide="wand-2" class="w-3 h-3 text-emerald-500"></i>
+              <span>Generate Tests</span>
+            </button>
+
+            <!-- Export Review Group -->
+            <div class="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/70" title="Download Reviewed Requirements Specification with Quality Analysis & Remediation Guide">
+              <span class="text-[10px] font-bold text-muted-foreground px-1 flex items-center gap-0.5">
+                <i data-lucide="download" class="w-2.5 h-2.5 text-indigo-500"></i> Review:
+              </span>
+              <button onclick="downloadRequirementReview('csv')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as CSV (for Excel / Sheets)">CSV</button>
+              <button onclick="downloadRequirementReview('md')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as Markdown">MD</button>
+              <button onclick="downloadRequirementReview('json')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as JSON">JSON</button>
+            </div>
+
+            <button onclick="clearRequirements()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
+          </div>
+        </div>
+
+        <!-- Requirements Analysis KPI summary bar -->
+        <div id="reqAnalysisSummaryBar" class="hidden mb-2.5 p-2 rounded-lg border border-border bg-muted/40 text-xs flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <span class="font-bold text-foreground flex items-center gap-1">
+              <i data-lucide="sparkles" class="w-3 h-3 text-indigo-500"></i> Quality:
+            </span>
+            <span id="summaryTestableRate" class="font-semibold text-emerald-600 dark:text-emerald-400">0% Testable</span>
+            <span id="summaryNeedsReview" class="text-amber-600 dark:text-amber-400">0 Review</span>
+            <span id="summaryUntestable" class="text-rose-600 dark:text-rose-400">0 Untestable</span>
+          </div>
+          <div class="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+            <span>Avg Score: <strong id="summaryAvgScore" class="text-foreground">0.0</strong></span>
+            <span>High Risk: <strong id="summaryHighRisk" class="text-foreground">0</strong></span>
+            <button onclick="downloadRequirementReview('csv')" class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 font-semibold text-[10px] rounded bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" title="Download full review scorecard and suggestions as CSV">
+              <i data-lucide="download" class="w-2.5 h-2.5"></i> Export Review
+            </button>
+          </div>
+        </div>
+
+        <div id="reqContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div class="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6 border-2 border-dashed border-border/80 rounded-lg">
+            <i data-lucide="inbox" class="w-8 h-8 mb-2 opacity-50"></i>
+            <p class="text-xs font-medium">No requirements loaded yet.</p>
+            <p class="text-[11px] text-muted-foreground/80 mt-1">Click "Load Sample Data", "Paste", or upload a PDF/DOCX/JSON/CSV file.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Cases Card -->
+      <div class="p-5 rounded-xl border border-border bg-card shadow-sm flex flex-col h-[400px]">
+        <div class="flex items-center justify-between pb-3 border-b border-border/70 mb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="list-checks" class="w-4 h-4 text-emerald-500"></i>
+            <h2 class="text-sm font-bold text-foreground">Candidate Test Cases</h2>
+            <span id="caseCountBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted text-muted-foreground">0 loaded</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="downloadCandidateCases('json')" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm" title="Download Candidate Test Cases as JSON">
+              <i data-lucide="download" class="w-3 h-3 text-emerald-500"></i>
+              <span>JSON</span>
+            </button>
+            <button onclick="downloadCandidateCases('csv')" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm" title="Download Candidate Test Cases as CSV">
+              <i data-lucide="download" class="w-3 h-3 text-emerald-500"></i>
+              <span>CSV</span>
+            </button>
+            <button onclick="clearCases()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
+          </div>
+        </div>
+        <div id="caseContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div class="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6 border-2 border-dashed border-border/80 rounded-lg">
+            <i data-lucide="clipboard-list" class="w-8 h-8 mb-2 opacity-50"></i>
+            <p class="text-xs font-medium">No candidate test cases loaded.</p>
+            <p class="text-[11px] text-muted-foreground/80 mt-1">Load the insurance test suite to run the evaluation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Section (Populated dynamically) -->
+    <div id="resultsSection" class="space-y-6 hidden">
+      
+      <!-- Metrics Dashboard -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <!-- Total -->
+        <div class="p-4 rounded-xl border border-border bg-card shadow-sm">
+          <p class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total Cases</p>
+          <p id="statTotal" class="text-2xl font-extrabold text-foreground mt-1">0</p>
+          <div class="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+            <i data-lucide="shield" class="w-3 h-3"></i> Scanned
+          </div>
+        </div>
+
+        <!-- Approved -->
+        <div class="p-4 rounded-xl border border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm">
+          <p class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Approved</p>
+          <p id="statApproved" class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">0</p>
+          <div class="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 flex items-center gap-1">
+            <i data-lucide="check-circle" class="w-3 h-3"></i> Ready to run
+          </div>
+        </div>
+
+        <!-- Revised -->
+        <div class="p-4 rounded-xl border border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 shadow-sm">
+          <p class="text-[11px] font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Revise</p>
+          <p id="statRevised" class="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">0</p>
+          <div class="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5 flex items-center gap-1">
+            <i data-lucide="edit-3" class="w-3 h-3"></i> Needs rework
+          </div>
+        </div>
+
+        <!-- Rejected -->
+        <div class="p-4 rounded-xl border border-rose-500/30 bg-rose-50/40 dark:bg-rose-950/20 shadow-sm">
+          <p class="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase tracking-wider">Rejected</p>
+          <p id="statRejected" class="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">0</p>
+          <div class="text-[11px] text-rose-600/80 dark:text-rose-400/80 mt-0.5 flex items-center gap-1">
+            <i data-lucide="x-circle" class="w-3 h-3"></i> Defect found
+          </div>
+        </div>
+
+        <!-- Human Review -->
+        <div class="p-4 rounded-xl border border-indigo-500/30 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-sm">
+          <p class="text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">Human Review</p>
+          <p id="statHumanReview" class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">0</p>
+          <div class="text-[11px] text-indigo-600/80 dark:text-indigo-400/80 mt-0.5 flex items-center gap-1">
+            <i data-lucide="user-check" class="w-3 h-3"></i> Disputed
+          </div>
+        </div>
+
+        <!-- Quality Score -->
+        <div class="p-4 rounded-xl border border-border bg-card shadow-sm">
+          <p class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Mean Score</p>
+          <p id="statMeanScore" class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">0.00</p>
+          <div class="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+            <i data-lucide="bar-chart-2" class="w-3 h-3"></i> Engine average
+          </div>
+        </div>
+      </div>
+
+      <!-- Requirement Level Findings (Coverage Gaps / Untraceable) -->
+      <div id="reqFindingsBox" class="p-4 rounded-xl border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 space-y-2 hidden">
+        <div class="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+          <span>Requirement Specification Findings</span>
+        </div>
+        <div id="reqFindingsList" class="space-y-1.5 text-xs text-amber-900/90 dark:text-amber-200"></div>
+      </div>
+
+      <!-- Detailed Test Cases Table -->
+      <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        
+        <!-- Table Toolbar & Filters -->
+        <div class="p-4 border-b border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="filterResults('all')" id="filterBtn_all" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white" data-filter="all">All <span id="filterCount_all" class="ml-1 opacity-80">(0)</span></button>
+            <button onclick="filterResults('approve')" id="filterBtn_approve" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:text-foreground" data-filter="approve">Approve <span id="filterCount_approve" class="ml-1 opacity-80">(0)</span></button>
+            <button onclick="filterResults('revise')" id="filterBtn_revise" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:text-foreground" data-filter="revise">Revise <span id="filterCount_revise" class="ml-1 opacity-80">(0)</span></button>
+            <button onclick="filterResults('reject')" id="filterBtn_reject" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:text-foreground" data-filter="reject">Reject <span id="filterCount_reject" class="ml-1 opacity-80">(0)</span></button>
+            <button onclick="filterResults('human_review')" id="filterBtn_human_review" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:text-foreground" data-filter="human_review">Human Review <span id="filterCount_human_review" class="ml-1 opacity-80">(0)</span></button>
+          </div>
+
+          <!-- Export Report & Approved Test Cases Buttons -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-medium text-muted-foreground mr-1">Report:</span>
+              <button onclick="downloadReport('json')" class="px-2 py-1 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors shadow-sm">JSON</button>
+              <button onclick="downloadReport('csv')" class="px-2 py-1 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors shadow-sm">CSV</button>
+              <button onclick="downloadReport('md')" class="px-2 py-1 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors shadow-sm">MD</button>
+              <button onclick="downloadReport('html')" class="px-2 py-1 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors shadow-sm">HTML</button>
+            </div>
+
+            <div class="flex items-center gap-1.5 border-l border-border pl-3">
+              <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                <span>Approved:</span>
+              </span>
+              <button onclick="downloadApprovedCases('json')" class="px-2 py-1 text-xs font-medium rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors shadow-sm">JSON</button>
+              <button onclick="downloadApprovedCases('csv')" class="px-2 py-1 text-xs font-medium rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors shadow-sm">CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-muted/50 border-b border-border/80 text-muted-foreground font-semibold">
+              <tr>
+                <th class="py-3 px-4 w-28">Case ID</th>
+                <th class="py-3 px-4 w-44">Verdict & Review</th>
+                <th class="py-3 px-4 w-24">Mean Score</th>
+                <th class="py-3 px-4">Reasons & Decision Analysis (5 Dimensions)</th>
+                <th class="py-3 px-4 w-28">Models</th>
+                <th class="py-3 px-4 w-28 text-right">Human Action</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody" class="divide-y divide-border/60">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-border/60 py-4 mt-auto text-center text-xs text-muted-foreground">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>Verdict AI — Test Case Gate Engine with Failover & Multi-Agent Consensus</p>
+      <p class="font-mono text-[11px]">71 unit & integration tests passing</p>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    let currentRequirements = [];
+    let currentCases = [];
+    let currentEvaluation = null;
+    let currentFilter = 'all';
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Theme Management
+    function initTheme() {
+      const savedTheme = localStorage.getItem('verdict_theme') || 'dark';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.getElementById('themeIconMoon').classList.remove('hidden');
+        document.getElementById('themeIconSun').classList.add('hidden');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('themeIconSun').classList.remove('hidden');
+        document.getElementById('themeIconMoon').classList.add('hidden');
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('verdict_theme', isDark ? 'dark' : 'light');
+      document.getElementById('themeIconMoon').classList.toggle('hidden', !isDark);
+      document.getElementById('themeIconSun').classList.toggle('hidden', isDark);
+    }
+
+    // Populate Domain List
+    async function loadDomains() {
+      try {
+        const res = await fetch('/api/domains');
+        if (!res.ok) return;
+        const tree = await res.json();
+        const select = document.getElementById('domainSelect');
+        select.innerHTML = '';
+        
+        function addNodes(nodes) {
+          nodes.forEach(node => {
+            const opt = document.createElement('option');
+            opt.value = node.path;
+            opt.textContent = `${node.path} (${node.name})`;
+            select.appendChild(opt);
+            if (node.children && node.children.length) {
+              addNodes(node.children);
+            }
+          });
+        }
+        addNodes(tree);
+        // Default to term life
+        select.value = 'insurance/life/term';
+      } catch (err) {
+        console.error("Failed to load domains", err);
+      }
+    }
+
+    // Load Sample Data
+    async function loadSampleData() {
+      try {
+        const res = await fetch('/api/sample');
+        if (!res.ok) throw new Error("Could not load sample data");
+        const data = await res.json();
+        
+        currentRequirements = data.requirements || [];
+        currentCases = data.cases || [];
+        currentAnalyses = {};
+        currentAnalysisSummary = null;
+        const bar = document.getElementById('reqAnalysisSummaryBar');
+        if (bar) bar.classList.add('hidden');
+
+        if (data.domain) {
+          document.getElementById('domainSelect').value = data.domain;
+        }
+
+        renderRequirementsList();
+        renderCasesList();
+      } catch (err) {
+        alert("Error loading sample data: " + err.message);
+      }
+    }
+
+    function clearRequirements() {
+      currentRequirements = [];
+      currentAnalyses = {};
+      currentAnalysisSummary = null;
+      const bar = document.getElementById('reqAnalysisSummaryBar');
+      if (bar) bar.classList.add('hidden');
+      renderRequirementsList();
+    }
+
+    function clearCases() {
+      currentCases = [];
+      renderCasesList();
+    }
+
+    function showToast(message, type = 'info') {
+      let container = document.getElementById('toastContainer');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full';
+        document.body.appendChild(container);
+      }
+
+      const toast = document.createElement('div');
+      let borderClass = 'border-blue-500/30 bg-card text-foreground';
+      let icon = '<i data-lucide="info" class="w-4 h-4 text-blue-500 shrink-0"></i>';
+      if (type === 'success') {
+        borderClass = 'border-emerald-500/40 bg-card text-foreground';
+        icon = '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500 shrink-0"></i>';
+      } else if (type === 'warning') {
+        borderClass = 'border-amber-500/40 bg-card text-foreground';
+        icon = '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 shrink-0"></i>';
+      } else if (type === 'error') {
+        borderClass = 'border-rose-500/40 bg-card text-foreground';
+        icon = '<i data-lucide="x-circle" class="w-4 h-4 text-rose-500 shrink-0"></i>';
+      }
+
+      toast.className = `pointer-events-auto p-3.5 rounded-xl border ${borderClass} shadow-xl flex items-start gap-2.5 text-xs transition-all duration-300 transform translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        ${icon}
+        <div class="flex-1 font-medium leading-relaxed">${message}</div>
+      `;
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function openPasteModal() {
+      document.getElementById('pasteTextInput').value = '';
+      document.getElementById('pasteModal').classList.remove('hidden');
+      document.getElementById('pasteTextInput').focus();
+      lucide.createIcons();
+    }
+
+    function closePasteModal() {
+      document.getElementById('pasteModal').classList.add('hidden');
+    }
+
+    async function submitPastedRequirements() {
+      const text = document.getElementById('pasteTextInput').value.trim();
+      if (!text) {
+        showToast('Please paste requirement text first.', 'warning');
+        return;
+      }
+      try {
+        const res = await fetch('/api/requirements/recognize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw_text: text }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Could not recognize requirements.');
+        }
+        const data = await res.json();
+        if (!data.requirements || !data.requirements.length) {
+          showToast('No requirements recognized from text.', 'warning');
+          return;
+        }
+        currentRequirements = data.requirements;
+        currentAnalyses = {};
+        currentAnalysisSummary = null;
+        document.getElementById('reqAnalysisSummaryBar').classList.add('hidden');
+        renderRequirementsList();
+        closePasteModal();
+        showToast(`Recognized ${data.requirements.length} requirements!`, 'success');
+      } catch (err) {
+        alert('Recognition error: ' + err.message);
+      }
+    }
+
+    async function analyzeRequirementsAction() {
+      if (!currentRequirements.length) {
+        showToast('Load or upload requirements first.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('analyzeReqsBtn');
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i><span>Analyzing...</span>`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch('/api/requirements/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requirements: currentRequirements,
+            domain: document.getElementById('domainSelect').value,
+            agent_mode: document.getElementById('agentModeSelect').value,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Analysis failed.');
+        }
+        const data = await res.json();
+        currentAnalyses = {};
+        for (const a of data.analyses) {
+          currentAnalyses[a.req_id] = a;
+        }
+        currentAnalysisSummary = data.summary;
+
+        // Render summary bar
+        const bar = document.getElementById('reqAnalysisSummaryBar');
+        bar.classList.remove('hidden');
+        const total = data.summary.total || 1;
+        const testablePct = Math.round((data.summary.testable / total) * 100);
+        document.getElementById('summaryTestableRate').textContent = `${testablePct}% Testable`;
+        document.getElementById('summaryNeedsReview').textContent = `${data.summary.needs_review} Review`;
+        document.getElementById('summaryUntestable').textContent = `${data.summary.untestable} Untestable`;
+        document.getElementById('summaryAvgScore').textContent = `${Math.round(data.summary.mean_score * 100)}%`;
+        document.getElementById('summaryHighRisk').textContent = data.summary.high_risk;
+
+        renderRequirementsList();
+        showToast(`Analyzed ${data.analyses.length} requirements. Overall quality: ${Math.round(data.summary.mean_score * 100)}%`, 'success');
+      } catch (err) {
+        alert('Requirement analysis error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        lucide.createIcons();
+      }
+    }
+
+    async function generateTestCasesAction() {
+      if (!currentRequirements.length) {
+        showToast('Load requirements before generating test cases.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('generateCasesBtn');
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i><span>Generating...</span>`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch('/api/requirements/generate-cases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requirements: currentRequirements,
+            domain: document.getElementById('domainSelect').value,
+            agent_mode: document.getElementById('agentModeSelect').value,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Test case generation failed.');
+        }
+        const data = await res.json();
+        currentCases = data.cases || [];
+        renderCasesList();
+        showToast(`Synthesized ${currentCases.length} candidate test cases!`, 'success');
+      } catch (err) {
+        alert('Test case generation error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        lucide.createIcons();
+      }
+    }
+
+    function renderRequirementsList() {
+      const c = document.getElementById('reqContainer');
+      document.getElementById('reqCountBadge').textContent = `${currentRequirements.length} loaded`;
+      if (!currentRequirements.length) {
+        c.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6 border-2 border-dashed border-border/80 rounded-lg">
+            <i data-lucide="inbox" class="w-8 h-8 mb-2 opacity-50"></i>
+            <p class="text-xs font-medium">No requirements loaded yet.</p>
+            <p class="text-[11px] text-muted-foreground/80 mt-1">Click "Load Sample Data", "Paste", or upload a PDF/DOCX/JSON/CSV file.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      c.innerHTML = currentRequirements.map(r => {
+        const a = currentAnalyses[r.id];
+        let scoreBadge = '';
+        let issuesHtml = '';
+        let scenariosHtml = '';
+
+        if (a) {
+          const pct = Math.round(a.testability_score * 100);
+          let badgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30';
+          if (a.testability_verdict === 'needs_review') {
+            badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-500/30';
+          } else if (a.testability_verdict === 'untestable') {
+            badgeClass = 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-500/30';
+          }
+          scoreBadge = `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${badgeClass}" title="${a.summary}">${pct}% ${a.testability_verdict.replace('_', ' ')}</span>`;
+
+          if (a.issues && a.issues.length) {
+            issuesHtml = `
+              <div class="pt-1 space-y-1">
+                ${a.issues.map(iss => `
+                  <div class="text-[10px] px-2 py-1 rounded bg-amber-50/70 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border border-amber-300/40 flex items-start gap-1.5">
+                    <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-500 shrink-0 mt-0.5"></i>
+                    <div>
+                      <span class="font-semibold">${iss.message}</span>
+                      <p class="text-amber-700/80 dark:text-amber-300/70 mt-0.5">${iss.suggestion}</p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }
+
+          if (a.suggested_scenarios && a.suggested_scenarios.length) {
+            scenariosHtml = `
+              <details class="text-[11px] pt-1 text-muted-foreground">
+                <summary class="cursor-pointer hover:text-foreground font-semibold flex items-center gap-1 select-none">
+                  <i data-lucide="list-plus" class="w-3 h-3 text-indigo-500"></i>
+                  <span>${a.suggested_scenarios.length} Recommended Test Scenarios</span>
+                </summary>
+                <div class="pl-4 pt-1.5 space-y-1">
+                  ${a.suggested_scenarios.map(sc => `
+                    <div class="flex items-start gap-1.5 text-[10px]">
+                      <span class="font-mono text-[9px] uppercase font-bold px-1 rounded bg-muted text-muted-foreground shrink-0">${sc.type}</span>
+                      <span>${sc.scenario}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </details>
+            `;
+          }
+        }
+
+        return `
+          <div class="p-3 rounded-lg border border-border bg-background/50 hover:bg-muted/40 transition-colors space-y-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono font-semibold text-indigo-600 dark:text-indigo-400 text-xs">${r.id}</span>
+                <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-muted text-muted-foreground uppercase">${r.risk || 'medium'}</span>
+              </div>
+              <div>${scoreBadge}</div>
+            </div>
+            <p class="text-xs font-semibold text-foreground">${r.title || r.id}</p>
+            <p class="text-[11px] text-muted-foreground line-clamp-2">${r.text || ''}</p>
+            ${r.acceptance_criteria ? `<p class="text-[10px] text-muted-foreground/80 italic line-clamp-1"><span class="font-semibold not-italic">AC:</span> ${r.acceptance_criteria}</p>` : ''}
+            ${issuesHtml}
+            ${scenariosHtml}
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function renderCasesList() {
+      const c = document.getElementById('caseContainer');
+      document.getElementById('caseCountBadge').textContent = `${currentCases.length} loaded`;
+      if (!currentCases.length) {
+        c.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6 border-2 border-dashed border-border/80 rounded-lg">
+            <i data-lucide="clipboard-list" class="w-8 h-8 mb-2 opacity-50"></i>
+            <p class="text-xs font-medium">No candidate test cases loaded.</p>
+            <p class="text-[11px] text-muted-foreground/80 mt-1">Load the insurance test suite to run the evaluation.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      // Group cases by requirement_id
+      const reqMap = {};
+      for (const r of currentRequirements) {
+        if (r && r.id) reqMap[r.id] = r;
+      }
+
+      const groups = new Map();
+      for (const tc of currentCases) {
+        const rid = tc.requirement_id || 'UNASSIGNED';
+        if (!groups.has(rid)) {
+          groups.set(rid, []);
+        }
+        groups.get(rid).push(tc);
+      }
+
+      const groupEntries = Array.from(groups.entries());
+      c.innerHTML = groupEntries.map(([rid, cases], idx) => {
+        const reqObj = reqMap[rid];
+        const reqTitle = reqObj ? (reqObj.title || reqObj.id) : '';
+        const isLast = idx === groupEntries.length - 1;
+
+        const casesHtml = cases.map(tc => `
+          <div class="p-3 rounded-lg border border-border bg-background/60 hover:bg-muted/40 transition-colors space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-xs">${escapeHtml(tc.id)}</span>
+              <span class="font-mono text-[10px] text-muted-foreground">Type: <span class="font-semibold text-foreground/80">${escapeHtml(tc.type || 'Positive')}</span></span>
+            </div>
+            <p class="text-xs text-foreground font-medium"><span class="text-muted-foreground">Scenario:</span> ${escapeHtml(tc.scenario || '')}</p>
+            <p class="text-[11px] text-muted-foreground"><span class="font-semibold text-foreground/80">Expected:</span> ${escapeHtml(tc.expected || '')}</p>
+          </div>
+        `).join('');
+
+        const breakHtml = !isLast ? `
+          <div class="relative py-2.5 flex items-center justify-center select-none">
+            <div class="w-full border-t border-dashed border-border/80"></div>
+            <span class="absolute bg-card px-2.5 py-0.5 text-[9px] uppercase font-mono font-semibold text-muted-foreground/70 tracking-widest rounded border border-border/60">
+              Next Requirement Group
+            </span>
+          </div>
+        ` : '';
+
+        return `
+          <div class="rounded-xl border border-border bg-card/60 p-3 space-y-2.5 shadow-xs">
+            <div class="flex items-center justify-between pb-2 border-b border-border/60">
+              <div class="flex items-center gap-2">
+                <span class="flex items-center justify-center w-5 h-5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono text-xs font-bold">
+                  <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                </span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400">${escapeHtml(rid)}</span>
+                  ${reqTitle ? `<span class="text-xs font-semibold text-foreground/90">— ${escapeHtml(reqTitle)}</span>` : ''}
+                </div>
+              </div>
+              <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-500/20">
+                ${cases.length} case${cases.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div class="space-y-2">
+              ${casesHtml}
+            </div>
+          </div>
+          ${breakHtml}
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // Handle File Upload
+    async function handleFileUpload(event) {
+      const files = event.target.files;
+      if (!files.length) return;
+
+      const formData = new FormData();
+      for (const file of files) {
+        const name = file.name.toLowerCase();
+        if (name.includes('req') || name.includes('requirement')) {
+          formData.append('requirements_file', file);
+        } else {
+          formData.append('cases_file', file);
+        }
+      }
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Upload failed");
+        }
+        const data = await res.json();
+        if (data.requirements && data.requirements.length) currentRequirements = data.requirements;
+        if (data.cases && data.cases.length) currentCases = data.cases;
+        renderRequirementsList();
+        renderCasesList();
+      } catch (err) {
+        alert("Upload error: " + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    // Run Evaluation
+    async function runEvaluation() {
+      if (!currentCases.length) {
+        if (currentRequirements.length) {
+          showToast("Synthesizing candidate test cases from requirements...", "info");
+          await generateTestCasesAction();
+          if (!currentCases.length) {
+            showToast("Could not synthesize test cases. Please try again.", "warning");
+            return;
+          }
+        } else {
+          showToast("Please load or upload requirements and test cases first.", "warning");
+          return;
+        }
+      }
+
+      const runBtn = document.getElementById('runBtn');
+      const origContent = runBtn.innerHTML;
+      runBtn.disabled = true;
+      runBtn.innerHTML = `<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Analyzing...</span>`;
+      lucide.createIcons();
+
+      const payload = {
+        requirements: currentRequirements,
+        cases: currentCases,
+        domain: document.getElementById('domainSelect').value,
+        approve_threshold: parseFloat(document.getElementById('threshSlider').value),
+        use_rules: true,
+        use_agents: true,
+        agent_mode: document.getElementById('agentModeSelect').value,
+      };
+
+      try {
+        const res = await fetch('/api/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          let errMsg = `Evaluation request failed (HTTP ${res.status})`;
+          try {
+            const err = await res.json();
+            errMsg = err.detail || errMsg;
+          } catch (_) {
+            const rawText = await res.text();
+            if (rawText) errMsg = rawText.slice(0, 300);
+          }
+          throw new Error(errMsg);
+        }
+
+        const data = await res.json();
+        currentEvaluation = data;
+        renderEvaluationResults(data);
+      } catch (err) {
+        alert("Error executing gate evaluation: " + err.message);
+      } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = origContent;
+        lucide.createIcons();
+      }
+    }
+
+    function renderEvaluationResults(data) {
+      document.getElementById('resultsSection').classList.remove('hidden');
+
+      // Requirement Findings
+      const rfBox = document.getElementById('reqFindingsBox');
+      const rfList = document.getElementById('reqFindingsList');
+      if (data.requirement_findings && data.requirement_findings.length) {
+        rfBox.classList.remove('hidden');
+        rfList.innerHTML = data.requirement_findings.map(f => `
+          <div class="flex items-start gap-2">
+            <span class="font-mono font-bold text-[11px] px-1.5 py-0.2 bg-amber-200/50 dark:bg-amber-800/40 rounded">${f.code}</span>
+            <span>Requirement <strong>${f.requirement_id || 'Global'}</strong>: ${f.reason}</span>
+          </div>
+        `).join('');
+      } else {
+        rfBox.classList.add('hidden');
+      }
+
+      updateSummaryStats();
+      renderTableRows();
+      document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function updateSummaryStats() {
+      if (!currentEvaluation || !currentEvaluation.gate_results) return;
+      const results = currentEvaluation.gate_results;
+      const total = results.length;
+      const approved = results.filter(r => r.decision === 'approve').length;
+      const revised = results.filter(r => r.decision === 'revise').length;
+      const rejected = results.filter(r => r.decision === 'reject').length;
+      const human_review = results.filter(r => r.decision === 'human_review').length;
+
+      const allMeans = results.map(r => r.mean_score || 1.0);
+      const mean_score = allMeans.length ? (allMeans.reduce((a, b) => a + b, 0) / allMeans.length) : 1.0;
+
+      currentEvaluation.summary = {
+        total_cases: total,
+        approved: approved,
+        revised: revised,
+        rejected: rejected,
+        human_review: human_review,
+        mean_score: parseFloat(mean_score.toFixed(2)),
+      };
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statApproved').textContent = approved;
+      document.getElementById('statRevised').textContent = revised;
+      document.getElementById('statRejected').textContent = rejected;
+      document.getElementById('statHumanReview').textContent = human_review;
+      document.getElementById('statMeanScore').textContent = mean_score.toFixed(2);
+
+      // Update Filter button counter badges
+      const fcAll = document.getElementById('filterCount_all');
+      if (fcAll) fcAll.textContent = `(${total})`;
+      const fcApprove = document.getElementById('filterCount_approve');
+      if (fcApprove) fcApprove.textContent = `(${approved})`;
+      const fcRevise = document.getElementById('filterCount_revise');
+      if (fcRevise) fcRevise.textContent = `(${revised})`;
+      const fcReject = document.getElementById('filterCount_reject');
+      if (fcReject) fcReject.textContent = `(${rejected})`;
+      const fcHuman = document.getElementById('filterCount_human_review');
+      if (fcHuman) fcHuman.textContent = `(${human_review})`;
+    }
+
+    function getDecisionBadge(decision, caseId, humanOverride) {
+      const map = {
+        approve: {
+          icon: 'check-circle',
+          text: 'Approve',
+          cls: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20',
+        },
+        revise: {
+          icon: 'edit-3',
+          text: 'Revise',
+          cls: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25 hover:bg-amber-500/20',
+        },
+        reject: {
+          icon: 'x-circle',
+          text: 'Reject',
+          cls: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 hover:bg-rose-500/20',
+        },
+        human_review: {
+          icon: 'user-check',
+          text: 'Human Review',
+          cls: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/25 hover:bg-indigo-500/20',
+        },
+      };
+      const def = map[decision] || { icon: 'help-circle', text: decision, cls: 'bg-muted text-muted-foreground' };
+      const overrideTag = humanOverride ? `
+        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[9px] font-bold rounded bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30" title="Manually reviewed and overridden by human auditor">
+          <i data-lucide="user" class="w-2.5 h-2.5"></i>
+          <span>Human</span>
+        </span>
+      ` : '';
+
+      return `
+        <div class="flex flex-col items-start gap-1">
+          <button type="button" onclick="openHumanReviewModal('${escapeHtml(caseId)}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${def.cls} hover:ring-2 hover:ring-indigo-500/40 active:scale-95 transition-all cursor-pointer shadow-xs select-none" title="Click to review and edit decision">
+            <i data-lucide="${def.icon}" class="w-3.5 h-3.5"></i>
+            <span>${def.text}</span>
+            <i data-lucide="edit-3" class="w-2.5 h-2.5 opacity-60 ml-0.5"></i>
+          </button>
+          ${overrideTag}
+        </div>
+      `;
+    }
+
+    function filterResults(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-filter') === filter) {
+          btn.className = "filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white";
+        } else {
+          btn.className = "filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:text-foreground";
+        }
+      });
+      renderTableRows();
+    }
+
+    function renderTableRows() {
+      if (!currentEvaluation) return;
+      const tbody = document.getElementById('resultsTableBody');
+      const items = currentEvaluation.gate_results.filter(r => {
+        if (currentFilter === 'all') return true;
+        return r.decision === currentFilter;
+      });
+
+      if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-muted-foreground">No test cases match filter "${currentFilter}".</td></tr>`;
+        return;
+      }
+
+      // Map case_id to requirement_id
+      const caseToReq = {};
+      for (const c of currentCases) {
+        caseToReq[c.id] = c.requirement_id || 'UNASSIGNED';
+      }
+      const reqMap = {};
+      for (const r of currentRequirements) {
+        if (r && r.id) reqMap[r.id] = r;
+      }
+
+      // Group evaluation items by requirement_id
+      const groups = new Map();
+      for (const r of items) {
+        const rid = caseToReq[r.case_id] || 'UNASSIGNED';
+        if (!groups.has(rid)) {
+          groups.set(rid, []);
+        }
+        groups.get(rid).push(r);
+      }
+
+      const groupEntries = Array.from(groups.entries());
+      let html = '';
+
+      groupEntries.forEach(([rid, groupItems], gIdx) => {
+        const reqObj = reqMap[rid];
+        const reqTitle = reqObj ? (reqObj.title || reqObj.id) : '';
+        const isLast = gIdx === groupEntries.length - 1;
+
+        // Requirement Group Header Row
+        html += `
+          <tr class="bg-indigo-50/70 dark:bg-indigo-950/30 border-t-2 border-b border-indigo-200 dark:border-indigo-900/60 font-semibold text-xs text-foreground">
+            <td colspan="6" class="py-2.5 px-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                    <i data-lucide="layers" class="w-3 h-3"></i>
+                  </span>
+                  <span class="font-mono font-bold text-xs text-indigo-700 dark:text-indigo-300">Requirement: ${escapeHtml(rid)}</span>
+                  ${reqTitle ? `<span class="text-xs font-semibold text-foreground/85">— ${escapeHtml(reqTitle)}</span>` : ''}
+                </div>
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-background text-indigo-700 dark:text-indigo-300 border border-indigo-300/40">
+                  ${groupItems.length} test case${groupItems.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </td>
+          </tr>
+        `;
+
+        // Test Cases for this Requirement
+        groupItems.forEach(r => {
+          const reasonsHtml = r.reasons && r.reasons.length 
+            ? `<ul class="list-disc pl-4 space-y-0.5">${r.reasons.map(res => `<li>${escapeHtml(res)}</li>`).join('')}</ul>`
+            : '<span class="text-muted-foreground">—</span>';
+
+          const modelsHtml = r.models_used && r.models_used.length
+            ? r.models_used.map(m => `<span class="inline-block px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground font-mono mr-1 mb-1">${escapeHtml(m)}</span>`).join('')
+            : '<span class="text-muted-foreground text-[11px]">—</span>';
+
+          const analysisBlock = r.analysis ? `
+            <details class="text-[11px] text-muted-foreground mt-2 group">
+              <summary class="cursor-pointer font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 select-none py-0.5">
+                <i data-lucide="microscope" class="w-3.5 h-3.5"></i>
+                <span>Decision Analysis (5 Dimensions)</span>
+              </summary>
+              <div class="mt-2 p-3 rounded-lg border border-border/80 bg-background/90 space-y-2 text-[11px] shadow-xs">
+                <div class="p-2 rounded bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/25 text-emerald-900 dark:text-emerald-200">
+                  <div class="font-bold flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                    <i data-lucide="check" class="w-3 h-3"></i> 1. Why Approved:
+                  </div>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed">${escapeHtml(r.analysis.why_approved)}</p>
+                </div>
+                <div class="p-2 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-500/25 text-amber-900 dark:text-amber-200">
+                  <div class="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                    <i data-lucide="edit-2" class="w-3 h-3"></i> 2. Why Should Be Revised:
+                  </div>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed">${escapeHtml(r.analysis.why_revised)}</p>
+                </div>
+                <div class="p-2 rounded bg-rose-50/70 dark:bg-rose-950/30 border border-rose-500/25 text-rose-900 dark:text-rose-200">
+                  <div class="font-bold flex items-center gap-1 text-rose-700 dark:text-rose-400">
+                    <i data-lucide="x" class="w-3 h-3"></i> 3. Why Rejected:
+                  </div>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed">${escapeHtml(r.analysis.why_rejected)}</p>
+                </div>
+                <div class="p-2 rounded bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-500/25 text-indigo-900 dark:text-indigo-200">
+                  <div class="font-bold flex items-center gap-1 text-indigo-700 dark:text-indigo-400">
+                    <i data-lucide="user-check" class="w-3 h-3"></i> 4. Human Review Actions Needed:
+                  </div>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed">${escapeHtml(r.analysis.human_review_actions)}</p>
+                </div>
+                <div class="p-2 rounded bg-slate-100/70 dark:bg-slate-900/40 border border-slate-500/25 text-slate-800 dark:text-slate-300">
+                  <div class="font-bold flex items-center gap-1 text-slate-700 dark:text-slate-400">
+                    <i data-lucide="scale" class="w-3 h-3"></i> 5. Grounds Left to Human:
+                  </div>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed">${escapeHtml(r.analysis.human_discretion_grounds)}</p>
+                </div>
+              </div>
+            </details>
+          ` : '';
+
+          html += `
+            <tr class="hover:bg-muted/30 transition-colors border-b border-border/40">
+              <td class="py-3 px-4 font-mono font-semibold text-foreground">${escapeHtml(r.case_id)}</td>
+              <td class="py-3 px-4">${getDecisionBadge(r.decision, r.case_id, r.human_override)}</td>
+              <td class="py-3 px-4 font-mono font-medium">${r.mean_score.toFixed(2)}</td>
+              <td class="py-3 px-4">
+                <div class="space-y-1">
+                  ${reasonsHtml}
+                  ${analysisBlock}
+                </div>
+              </td>
+              <td class="py-3 px-4">${modelsHtml}</td>
+              <td class="py-3 px-4 text-right">
+                <button type="button" onclick="openHumanReviewModal('${escapeHtml(r.case_id)}')" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-border bg-background hover:bg-muted text-foreground transition-all shadow-xs cursor-pointer" title="Review & Override Verdict">
+                  <i data-lucide="user-check" class="w-3 h-3 text-indigo-500"></i>
+                  <span>Review</span>
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+
+        // Break between requirement groups
+        if (!isLast) {
+          html += `
+            <tr class="bg-muted/20 select-none">
+              <td colspan="6" class="py-2.5 px-4 text-center">
+                <div class="flex items-center justify-center gap-3">
+                  <div class="flex-1 border-t border-dashed border-border/70"></div>
+                  <span class="text-[9px] font-mono uppercase font-semibold text-muted-foreground/60 tracking-wider">Requirement Group Break</span>
+                  <div class="flex-1 border-t border-dashed border-border/70"></div>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      });
+
+      tbody.innerHTML = html;
+      lucide.createIcons();
+    }
+
+
+    // Report Downloads
+    function downloadReport(format) {
+      if (!currentEvaluation || !currentEvaluation.reports) return;
+      const content = currentEvaluation.reports[format];
+      if (!content) return;
+
+      const mimes = {
+        json: 'application/json',
+        csv: 'text/csv',
+        md: 'text/markdown',
+        html: 'text/html',
+      };
+
+      const blob = new Blob([content], { type: mimes[format] || 'text/plain' });
+      triggerDownload(blob, `verdict_report.${format}`);
+    }
+
+    // Test Cases Downloads
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded ${filename}`, 'success');
+    }
+
+    async function downloadCasesData(cases, filename, format) {
+      if (!cases || !cases.length) {
+        showToast('No test cases available to download.', 'warning');
+        return;
+      }
+
+      if (format === 'json') {
+        const groups = {};
+        for (const c of cases) {
+          const rid = c.requirement_id || 'UNASSIGNED';
+          if (!groups[rid]) groups[rid] = [];
+          groups[rid].push(c);
+        }
+        const jsonStr = JSON.stringify({ groups: groups, cases: cases }, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        triggerDownload(blob, `${filename}.json`);
+      } else if (format === 'csv') {
+        try {
+          const resp = await fetch('/api/cases/export/csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cases),
+          });
+          if (!resp.ok) throw new Error('CSV export failed');
+          const blob = await resp.blob();
+          triggerDownload(blob, `${filename}.csv`);
+        } catch (e) {
+          // Client-side RFC-4180 CSV fallback with requirement grouping & group breaks
+          const groups = {};
+          for (const c of cases) {
+            const rid = c.requirement_id || 'UNASSIGNED';
+            if (!groups[rid]) groups[rid] = [];
+            groups[rid].push(c);
+          }
+          const headers = ['id', 'requirement_id', 'type', 'scenario', 'expected'];
+          const lines = [headers.join(',')];
+          let firstGrp = true;
+          for (const [rid, grp] of Object.entries(groups)) {
+            if (!firstGrp) {
+              lines.push(',,,,'); // Blank line break between groups
+            }
+            firstGrp = false;
+            lines.push(`"=== REQUIREMENT: ${rid.replace(/"/g, '""')} (${grp.length} test cases) ===","","","",""`);
+            for (const c of grp) {
+              lines.push([
+                `"${(c.id || '').replace(/"/g, '""')}"`,
+                `"${(c.requirement_id || '').replace(/"/g, '""')}"`,
+                `"${(c.type || '').replace(/"/g, '""')}"`,
+                `"${(c.scenario || '').replace(/"/g, '""')}"`,
+                `"${(c.expected || '').replace(/"/g, '""')}"`,
+              ].join(','));
+            }
+          }
+          const csvText = lines.join('\r\n');
+          const blob = new Blob([csvText], { type: 'text/csv' });
+          triggerDownload(blob, `${filename}.csv`);
+        }
+      }
+    }
+
+    async function downloadRequirementReview(format = 'csv') {
+      if (!currentRequirements.length) {
+        showToast('No requirements loaded to download review.', 'warning');
+        return;
+      }
+
+      showToast(`Generating ${format.toUpperCase()} requirement review export...`, 'info');
+
+      try {
+        const payload = {
+          requirements: currentRequirements,
+          analyses: Object.values(currentAnalyses || {}),
+          domain: document.getElementById('domainSelect').value,
+          agent_mode: document.getElementById('agentModeSelect').value,
+        };
+
+        const resp = await fetch(`/api/requirements/export/${format}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || 'Export failed');
+        }
+
+        const blob = await resp.blob();
+        triggerDownload(blob, `requirements_review_report.${format}`);
+      } catch (err) {
+        alert('Download error: ' + err.message);
+      }
+    }
+
+    function downloadCandidateCases(format) {
+      if (!currentCases.length) {
+        showToast('No candidate test cases loaded.', 'warning');
+        return;
+      }
+      downloadCasesData(currentCases, 'candidate_test_cases', format);
+    }
+
+    function downloadApprovedCases(format) {
+      if (!currentEvaluation || !currentEvaluation.gate_results) {
+        showToast('Run Verdict Gate first to generate approved test cases.', 'warning');
+        return;
+      }
+      const approvedIds = new Set(
+        currentEvaluation.gate_results
+          .filter(r => r.decision === 'approve')
+          .map(r => r.case_id)
+      );
+      const approved = currentCases.filter(c => approvedIds.has(c.id));
+      if (!approved.length) {
+        showToast('No approved test cases in current evaluation.', 'info');
+        return;
+      }
+      downloadCasesData(approved, 'verdict_approved_test_cases', format);
+    }
+
+    // Human Review & Decision Override Modal
+    let activeReviewCaseId = null;
+    let modalSelectedDecision = 'approve';
+
+    function openHumanReviewModal(caseId) {
+      if (!currentEvaluation || !currentEvaluation.gate_results) {
+        showToast('No active evaluation results to review.', 'warning');
+        return;
+      }
+
+      const resItem = currentEvaluation.gate_results.find(r => r.case_id === caseId);
+      if (!resItem) {
+        showToast(`Test case ${caseId} not found in evaluation results.`, 'error');
+        return;
+      }
+
+      activeReviewCaseId = caseId;
+      modalSelectedDecision = resItem.decision || 'approve';
+
+      const caseObj = currentCases.find(c => c.id === caseId) || {};
+      const analysis = resItem.analysis || {};
+
+      document.getElementById('hrModalCaseId').textContent = caseId;
+      document.getElementById('hrModalReqId').textContent = caseObj.requirement_id || 'UNASSIGNED';
+      document.getElementById('hrModalScenario').textContent = caseObj.scenario || '—';
+      document.getElementById('hrModalExpected').textContent = caseObj.expected || '—';
+      document.getElementById('hrModalScore').textContent = (resItem.mean_score || 1.0).toFixed(2);
+
+      // Pre-fill analysis fields
+      document.getElementById('hrAnalysisWhyApproved').value = analysis.why_approved || '';
+      document.getElementById('hrAnalysisWhyRevised').value = analysis.why_revised || '';
+      document.getElementById('hrAnalysisWhyRejected').value = analysis.why_rejected || '';
+      document.getElementById('hrAnalysisActions').value = analysis.human_review_actions || '';
+      document.getElementById('hrAnalysisGrounds').value = analysis.human_discretion_grounds || '';
+      document.getElementById('hrReviewerNotes').value = resItem.human_notes || '';
+
+      selectModalDecision(modalSelectedDecision);
+
+      document.getElementById('humanReviewModal').classList.remove('hidden');
+      document.getElementById('humanReviewModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function selectModalDecision(decision) {
+      modalSelectedDecision = decision;
+      const buttons = {
+        approve: document.getElementById('hrBtnApprove'),
+        revise: document.getElementById('hrBtnRevise'),
+        reject: document.getElementById('hrBtnReject'),
+        human_review: document.getElementById('hrBtnHumanReview'),
+      };
+
+      const activeClasses = {
+        approve: 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/40',
+        revise: 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-500/40',
+        reject: 'bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-500/40',
+        human_review: 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-500/40',
+      };
+
+      const inactiveClasses = 'bg-card text-foreground border-border hover:bg-muted/70';
+
+      for (const [key, btn] of Object.entries(buttons)) {
+        if (!btn) continue;
+        btn.className = `flex-1 py-2.5 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${key === decision ? activeClasses[key] : inactiveClasses}`;
+      }
+    }
+
+    function saveHumanReviewDecision() {
+      if (!activeReviewCaseId || !currentEvaluation || !currentEvaluation.gate_results) {
+        closeHumanReviewModal();
+        return;
+      }
+
+      const resItem = currentEvaluation.gate_results.find(r => r.case_id === activeReviewCaseId);
+      if (!resItem) {
+        closeHumanReviewModal();
+        return;
+      }
+
+      const oldDecision = resItem.decision;
+      const newDecision = modalSelectedDecision;
+
+      // Update decision and human override flag
+      resItem.decision = newDecision;
+      resItem.human_override = true;
+
+      // Read edited 5-dimension analysis
+      const whyApproved = document.getElementById('hrAnalysisWhyApproved').value.trim();
+      const whyRevised = document.getElementById('hrAnalysisWhyRevised').value.trim();
+      const whyRejected = document.getElementById('hrAnalysisWhyRejected').value.trim();
+      const actions = document.getElementById('hrAnalysisActions').value.trim();
+      const grounds = document.getElementById('hrAnalysisGrounds').value.trim();
+      const reviewerNotes = document.getElementById('hrReviewerNotes').value.trim();
+
+      resItem.analysis = {
+        why_approved: whyApproved || resItem.analysis?.why_approved || 'Approved by human reviewer.',
+        why_revised: whyRevised || resItem.analysis?.why_revised || 'No revisions requested by reviewer.',
+        why_rejected: whyRejected || resItem.analysis?.why_rejected || 'Not rejected by reviewer.',
+        human_review_actions: actions || resItem.analysis?.human_review_actions || 'Reviewed and finalized by human auditor.',
+        human_discretion_grounds: grounds || resItem.analysis?.human_discretion_grounds || 'Decided under authorized human oversight.',
+      };
+      resItem.human_notes = reviewerNotes;
+
+      // Add to reasons if reviewer notes provided
+      if (reviewerNotes) {
+        if (!resItem.reasons) resItem.reasons = [];
+        const prefix = `[Human Override (${newDecision.toUpperCase()})]: `;
+        const existingIdx = resItem.reasons.findIndex(r => r.startsWith('[Human Override'));
+        if (existingIdx >= 0) {
+          resItem.reasons[existingIdx] = prefix + reviewerNotes;
+        } else {
+          resItem.reasons.unshift(prefix + reviewerNotes);
+        }
+      }
+
+      updateSummaryStats();
+      renderTableRows();
+      closeHumanReviewModal();
+      showToast(`Updated decision for ${activeReviewCaseId} to ${newDecision.toUpperCase()}`, 'success');
+    }
+
+    function closeHumanReviewModal() {
+      activeReviewCaseId = null;
+      const modal = document.getElementById('humanReviewModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    // Keyboard Shortcut (Ctrl+Enter to Run)
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        runEvaluation();
+      }
+      if (e.key === 'Escape') {
+        closeHumanReviewModal();
+        closePasteModal();
+      }
+    });
+
+    // Initialize
+    initTheme();
+    loadDomains();
+    loadSampleData();
+    lucide.createIcons();
+  </script>
+
+  <!-- Raw Text Paste Modal -->
+  <div id="pasteModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-card border border-border rounded-xl max-w-2xl w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-border">
+        <div class="flex items-center gap-2">
+          <i data-lucide="clipboard-paste" class="w-4 h-4 text-indigo-500"></i>
+          <h3 class="text-sm font-bold text-foreground">Paste Requirements / User Stories</h3>
+        </div>
+        <button onclick="closePasteModal()" class="text-muted-foreground hover:text-foreground">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        Paste any plain text requirements, numbered clauses, user stories (<code class="bg-muted px-1 rounded">As a &lt;role&gt;, I want...</code>), or acceptance criteria. Verdict AI will recognize and parse them automatically.
+      </p>
+      <textarea id="pasteTextInput" rows="10" placeholder="1. User Authentication&#10;The system shall authenticate users with multi-factor authentication.&#10;Acceptance criteria: MFA token expires after 5 minutes.&#10;&#10;2. Policy Issuance&#10;As an underwriter, I want to approve applications up to $500,000..." class="w-full text-xs font-mono p-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"></textarea>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closePasteModal()" class="px-3.5 py-2 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted text-foreground">Cancel</button>
+        <button onclick="submitPastedRequirements()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Recognize & Load</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Human Review & Verdict Override Modal -->
+  <div id="humanReviewModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-card border border-border rounded-xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-border shrink-0">
+        <div class="flex items-center gap-2.5">
+          <span class="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <h3 class="text-sm font-bold text-foreground">Human Verdict Review & Decision Override</h3>
+            <p class="text-[11px] text-muted-foreground">Inspect multi-agent consensus, adjust verdicts, and document human auditor rationales</p>
+          </div>
+        </div>
+        <button onclick="closeHumanReviewModal()" class="text-muted-foreground hover:text-foreground p-1 rounded-md">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div class="space-y-4 overflow-y-auto pr-1">
+        <!-- Metadata Pill Row -->
+        <div class="p-3 rounded-lg bg-muted/40 border border-border flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-3">
+            <div>
+              <span class="text-muted-foreground text-[10px] uppercase font-semibold">Case ID</span>
+              <div id="hrModalCaseId" class="font-mono font-bold text-foreground">TC-001</div>
+            </div>
+            <div class="h-6 w-px bg-border"></div>
+            <div>
+              <span class="text-muted-foreground text-[10px] uppercase font-semibold">Requirement</span>
+              <div id="hrModalReqId" class="font-mono font-bold text-indigo-600 dark:text-indigo-400">REQ-001</div>
+            </div>
+            <div class="h-6 w-px bg-border"></div>
+            <div>
+              <span class="text-muted-foreground text-[10px] uppercase font-semibold">Mean Score</span>
+              <div id="hrModalScore" class="font-mono font-bold text-foreground">0.95</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scenario & Expected Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="p-2.5 rounded-lg border border-border/80 bg-background/80">
+            <span class="text-[10px] font-semibold text-muted-foreground uppercase">Scenario:</span>
+            <p id="hrModalScenario" class="mt-1 text-foreground font-mono text-[11px] leading-relaxed break-words line-clamp-3"></p>
+          </div>
+          <div class="p-2.5 rounded-lg border border-border/80 bg-background/80">
+            <span class="text-[10px] font-semibold text-muted-foreground uppercase">Expected:</span>
+            <p id="hrModalExpected" class="mt-1 text-foreground font-mono text-[11px] leading-relaxed break-words line-clamp-3"></p>
+          </div>
+        </div>
+
+        <!-- Decision Selector -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold text-foreground flex items-center justify-between">
+            <span>Select Target Verdict Decision:</span>
+            <span class="text-[10px] text-muted-foreground font-normal">Click any button to override gate decision</span>
+          </label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" id="hrBtnApprove" onclick="selectModalDecision('approve')">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span>Approve</span>
+            </button>
+            <button type="button" id="hrBtnRevise" onclick="selectModalDecision('revise')">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+              <span>Revise</span>
+            </button>
+            <button type="button" id="hrBtnReject" onclick="selectModalDecision('reject')">
+              <i data-lucide="x-circle" class="w-4 h-4"></i>
+              <span>Reject</span>
+            </button>
+            <button type="button" id="hrBtnHumanReview" onclick="selectModalDecision('human_review')">
+              <i data-lucide="user-check" class="w-4 h-4"></i>
+              <span>Human Review</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5 Dimensions Decision Analysis -->
+        <div class="space-y-3 pt-2">
+          <div class="flex items-center justify-between border-b border-border/80 pb-1.5">
+            <h4 class="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <i data-lucide="microscope" class="w-4 h-4 text-indigo-500"></i>
+              <span>Decision Analysis & Rationales (5 Dimensions)</span>
+            </h4>
+            <span class="text-[10px] text-muted-foreground">Editable grounds and operational review checklist</span>
+          </div>
+
+          <!-- Dimension 1: Why Approved -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              <span>1. Why is it approved?</span>
+            </label>
+            <textarea id="hrAnalysisWhyApproved" rows="2" class="w-full text-xs font-sans p-2 rounded-md border border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20 text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Valid test case criteria, requirement alignment, high consensus score..."></textarea>
+          </div>
+
+          <!-- Dimension 2: Why Revise -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+              <span>2. Why should it be revised?</span>
+            </label>
+            <textarea id="hrAnalysisWhyRevised" rows="2" class="w-full text-xs font-sans p-2 rounded-md border border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/20 text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="Flaws, vague thresholds, missing boundaries, edge cases needing refinement..."></textarea>
+          </div>
+
+          <!-- Dimension 3: Why Rejected -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>3. Why is it rejected?</span>
+            </label>
+            <textarea id="hrAnalysisWhyRejected" rows="2" class="w-full text-xs font-sans p-2 rounded-md border border-rose-500/30 bg-rose-50/20 dark:bg-rose-950/20 text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500" placeholder="Contradicts requirement, invalid business rule, non-executable, hallucination..."></textarea>
+          </div>
+
+          <!-- Dimension 4: Human Review Actions -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+              <span>4. What human review needs to be taken up?</span>
+            </label>
+            <textarea id="hrAnalysisActions" rows="2" class="w-full text-xs font-sans p-2 rounded-md border border-indigo-500/30 bg-indigo-50/20 dark:bg-indigo-950/20 text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Verify with legal compliance, test on staging environment, validate third-party SLA..."></textarea>
+          </div>
+
+          <!-- Dimension 5: Grounds Left to Human -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <i data-lucide="scale" class="w-3.5 h-3.5"></i>
+              <span>5. What grounds should be left to the human?</span>
+            </label>
+            <textarea id="hrAnalysisGrounds" rows="2" class="w-full text-xs font-sans p-2 rounded-md border border-border bg-muted/30 text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Risk appetite tolerance, strategic business priorities, exceptions, policy overrides..."></textarea>
+          </div>
+
+          <!-- Reviewer Note -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-bold text-foreground flex items-center gap-1">
+              <i data-lucide="message-square" class="w-3.5 h-3.5 text-muted-foreground"></i>
+              <span>Auditor Override Note / Justification:</span>
+            </label>
+            <input type="text" id="hrReviewerNotes" class="w-full text-xs p-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="e.g., Overridden to Approve after clarifying threshold with Lead Underwriter.">
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-border shrink-0">
+        <button onclick="closeHumanReviewModal()" class="px-4 py-2 text-xs font-semibold rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-all">Cancel</button>
+        <button onclick="saveHumanReviewDecision()" class="px-5 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-md flex items-center gap-1.5 transition-all cursor-pointer">
+          <i data-lucide="save" class="w-3.5 h-3.5"></i>
+          <span>Save Human Verdict & Recompute</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

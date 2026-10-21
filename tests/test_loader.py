@@ -66,9 +66,9 @@ def test_cases_csv_and_json(tmp_path):
 
 
 def test_unsupported_and_missing_files(tmp_path):
-    bad = tmp_path / "x.xlsx"
+    bad = tmp_path / "x.bad_ext"
     bad.write_text("x")
-    with pytest.raises(LoadError, match="PDF, CSV or JSON"):
+    with pytest.raises(LoadError, match="Unsupported file type"):
         load_requirements(bad)
     with pytest.raises(LoadError, match="not found"):
         load_requirements(tmp_path / "nope.json")
@@ -85,3 +85,47 @@ def test_duplicate_ids_rejected(tmp_path):
 def test_pdf_without_requirements_gives_clear_error():
     with pytest.raises(LoadError, match="looks like a test case file"):
         load_requirements(TC_PDF)
+
+
+def test_multi_domain_banking_files():
+    req_pdf = ROOT / "Banking_Domain_Sample_Requirements.pdf"
+    req_docx = ROOT / "Banking_Domain_Sample_Requirements.docx"
+    cases_xlsx = ROOT / "Banking_Domain_Detailed_Test_Cases.xlsx"
+
+    if req_pdf.exists():
+        reqs = load_requirements(req_pdf)
+        assert len(reqs) == 10
+        assert reqs[0].id == "BR-001"
+    if req_docx.exists():
+        reqs = load_requirements(req_docx)
+        assert len(reqs) == 10
+        assert reqs[0].id == "BR-001"
+    if cases_xlsx.exists():
+        cases = load_cases(cases_xlsx)
+        assert len(cases) == 30
+        assert cases[0].id == "TC-001-01"
+
+
+def test_multi_domain_pnc_files():
+    req_pdf = ROOT / "Sample_PnC_Insurance_Requirements.pdf"
+    req_docx = ROOT / "Sample_PnC_Insurance_Requirements.docx"
+    cases_xlsx = ROOT / "Sample_PnC_Insurance_Test_Cases.xlsx"
+    cases_docx = ROOT / "Sample_PnC_Insurance_Test_Cases.docx"
+
+    if req_pdf.exists():
+        reqs = load_requirements(req_pdf)
+        assert len(reqs) == 10
+        assert reqs[0].id == "PNC-REQ-001"
+    if req_docx.exists():
+        reqs = load_requirements(req_docx)
+        assert len(reqs) == 10
+        assert reqs[0].id == "PNC-REQ-001"
+    if cases_xlsx.exists():
+        cases = load_cases(cases_xlsx)
+        assert len(cases) == 47
+        assert cases[0].id == "PNC-001"
+    if cases_docx.exists():
+        cases = load_cases(cases_docx)
+        assert len(cases) == 47
+        assert cases[0].id == "PNC-001"
+

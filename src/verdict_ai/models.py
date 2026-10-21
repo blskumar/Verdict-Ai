@@ -36,6 +36,30 @@ class TestCase(BaseModel):
 
 Decision = Literal["approve", "revise", "reject", "human_review"]
 
+CheckSource = Literal["rule", "model"]
+
+
+class CheckResult(BaseModel):
+    """One check outcome for one test case, from either a rule or a model."""
+
+    check_name: str  # e.g. "vague_expected" or "scenario_reviewer"
+    case_id: str
+    passed: bool  # True = no problem found
+    score: float = Field(ge=0.0, le=1.0)  # 0 = worst, 1 = best
+    reason: str
+    source: CheckSource
+    model_name: str | None = None  # None for rule-based checks
+
+
+class GateResult(BaseModel):
+    """Final aggregated verdict for one test case."""
+
+    case_id: str
+    decision: Decision
+    reasons: list[str]  # one entry per contributing check
+    scores: dict[str, float]  # check_name -> score
+    models_used: list[str]  # model names that contributed (deduplicated)
+
 
 class SeededBadCase(TestCase):
     """A deliberately flawed case. The labels say what the gate should do."""
