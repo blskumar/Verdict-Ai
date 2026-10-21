@@ -419,6 +419,7 @@ def create_app() -> FastAPI:
         requirements_file: UploadFile | None = File(None),
         cases_file: UploadFile | None = File(None),
         file: UploadFile | None = File(None),
+        files: list[UploadFile] | None = File(None),
     ) -> dict[str, Any]:
         """Parse uploaded requirements and/or cases from PDF, DOCX, XLSX, JSON, or CSV."""
         parsed_reqs: list[dict[str, Any]] = []
@@ -429,49 +430,53 @@ def create_app() -> FastAPI:
                 if not f or not f.filename:
                     return
                 safe_name = Path(f.filename).name
+                content = await f.read()
+                if not content:
+                    return
                 tmp_path = Path(tmp_dir) / safe_name
-                tmp_path.write_bytes(await f.read())
+                tmp_path.write_bytes(content)
 
                 if preferred_type == "requirements":
                     try:
                         loaded = load_requirements(tmp_path)
                         parsed_reqs.extend([r.model_dump() for r in loaded])
                         return
-                    except LoadError as exc:
+                    except Exception:
                         try:
                             loaded_cases = load_cases(tmp_path)
                             parsed_cases.extend([c.model_dump() for c in loaded_cases])
                             return
-                        except LoadError:
+                        except Exception:
                             pass
-                        raise HTTPException(status_code=400, detail=f"Requirements upload error: {exc}")
+                        raise HTTPException(status_code=400, detail=f"Could not parse '{safe_name}' as requirements specification.")
                 elif preferred_type == "cases":
                     try:
                         loaded = load_cases(tmp_path)
                         parsed_cases.extend([c.model_dump() for c in loaded])
                         return
-                    except LoadError as exc:
+                    except Exception:
                         try:
                             loaded_reqs = load_requirements(tmp_path)
                             parsed_reqs.extend([r.model_dump() for r in loaded_reqs])
                             return
-                        except LoadError:
+                        except Exception:
                             pass
-                        raise HTTPException(status_code=400, detail=f"Test cases upload error: {exc}")
+                        raise HTTPException(status_code=400, detail=f"Could not parse '{safe_name}' as test cases.")
                 else:
                     # Auto-detect: try requirements then test cases
                     try:
                         loaded = load_requirements(tmp_path)
                         parsed_reqs.extend([r.model_dump() for r in loaded])
                         return
-                    except LoadError:
+                    except Exception:
                         pass
                     try:
                         loaded = load_cases(tmp_path)
                         parsed_cases.extend([c.model_dump() for c in loaded])
                         return
-                    except LoadError as exc:
-                        raise HTTPException(status_code=400, detail=f"Could not parse {safe_name} as requirements or test cases: {exc}")
+                    except Exception:
+                        pass
+                    raise HTTPException(status_code=400, detail=f"Could not parse '{safe_name}' as requirements or test cases. Please check format.")
 
             if requirements_file:
                 await _process_upload(requirements_file, "requirements")
@@ -479,6 +484,9 @@ def create_app() -> FastAPI:
                 await _process_upload(cases_file, "cases")
             if file:
                 await _process_upload(file, None)
+            if files:
+                for f_item in files:
+                    await _process_upload(f_item, None)
 
         return {
             "requirements": parsed_reqs,

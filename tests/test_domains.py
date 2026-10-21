@@ -11,8 +11,11 @@ ROOT = Path(__file__).resolve().parents[1] / "domains"
 
 def test_tree_has_two_branches():
     t = d.tree(ROOT)
-    assert [n["path"] for n in t] == ["insurance"]
-    branches = {c["path"]: [k["path"] for k in c["children"]] for c in t[0]["children"]}
+    paths = [n["path"] for n in t]
+    assert "insurance" in paths
+    assert "banking" in paths
+    ins = next(n for n in t if n["path"] == "insurance")
+    branches = {c["path"]: [k["path"] for k in c["children"]] for c in ins["children"]}
     assert branches == {
         "insurance/life": ["insurance/life/common", "insurance/life/term", "insurance/life/whole-life"],
         "insurance/p-and-c": ["insurance/p-and-c/commercial-auto", "insurance/p-and-c/homeowners"],

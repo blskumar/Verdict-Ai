@@ -988,34 +988,82 @@
     // Handle File Upload
     async function handleFileUpload(event) {
       const files = event.target.files;
-      if (!files.length) return;
+      if (!files || !files.length) return;
 
       const formData = new FormData();
       for (const file of files) {
         const name = file.name.toLowerCase();
         if (name.includes('req') || name.includes('requirement')) {
           formData.append('requirements_file', file);
-        } else {
+        } else if (name.includes('case') || name.includes('test') || name.includes('answer')) {
           formData.append('cases_file', file);
+        } else {
+          formData.append('file', file);
         }
       }
 
+      showToast(`Uploading ${files.length} file(s)...`, 'info');
+
       try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || "Upload failed");
+        let res;
+        try {
+          res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (fetchErr) {
+          // Retry once after 600ms if transient connection glitch
+          await new Promise(r => setTimeout(r, 600));
+          res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
         }
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Upload failed with HTTP ${res.status}`);
+        }
+
         const data = await res.json();
-        if (data.requirements && data.requirements.length) currentRequirements = data.requirements;
-        if (data.cases && data.cases.length) currentCases = data.cases;
+        let loadedReqCount = 0;
+        let loadedCaseCount = 0;
+
+        if (data.requirements && data.requirements.length) {
+          currentRequirements = data.requirements;
+          currentAnalyses = {};
+          currentAnalysisSummary = null;
+          const bar = document.getElementById('reqAnalysisSummaryBar');
+          if (bar) bar.classList.add('hidden');
+          loadedReqCount = data.requirements.length;
+
+          // If only requirements uploaded, clear previous test cases and results to prevent mismatch
+          if (!data.cases || !data.cases.length) {
+            currentCases = [];
+            currentEvaluation = null;
+            const resSec = document.getElementById('resultsSection');
+            if (resSec) resSec.classList.add('hidden');
+          }
+        }
+
+        if (data.cases && data.cases.length) {
+          currentCases = data.cases;
+          loadedCaseCount = data.cases.length;
+        }
+
         renderRequirementsList();
         renderCasesList();
+
+        let msg = [];
+        if (loadedReqCount) msg.push(`${loadedReqCount} requirement(s)`);
+        if (loadedCaseCount) msg.push(`${loadedCaseCount} test case(s)`);
+        showToast(`Successfully uploaded ${msg.join(' and ') || 'files'}!`, 'success');
       } catch (err) {
-        alert("Upload error: " + err.message);
+        const errMsg = err.message === 'Failed to fetch'
+          ? 'Could not connect to Verdict AI server (127.0.0.1:8000). Please ensure server is running.'
+          : err.message;
+        showToast(`Upload error: ${errMsg}`, 'error');
+        alert("Upload error: " + errMsg);
       } finally {
         event.target.value = '';
       }

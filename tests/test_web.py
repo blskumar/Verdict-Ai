@@ -301,3 +301,95 @@ def test_api_cases_export_grouped(client: TestClient) -> None:
     assert len(data["groups"]["REQ-B"]) == 1
 
 
+def test_banking_domain_and_uploads(client: TestClient) -> None:
+    # 1. Verify banking is exposed in /api/domains
+    resp = client.get("/api/domains")
+    assert resp.status_code == 200
+    domains = resp.json()
+    paths = [d["path"] for d in domains]
+    assert "banking" in paths
+    assert "insurance" in paths
+
+    # 2. Upload banking requirements JSON via auto-detect 'file'
+    with open("data/requirements/banking_requirements.json", "rb") as f:
+        resp = client.post("/api/upload", files={"file": ("banking_requirements.json", f, "application/json")})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["requirements_count"] == 10
+    assert data["requirements"][0]["id"] == "BANK-REQ-001"
+
+    # 3. Upload banking requirements CSV
+    with open("data/requirements/banking_requirements.csv", "rb") as f:
+        resp = client.post("/api/upload", files={"requirements_file": ("banking_requirements.csv", f, "text/csv")})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["requirements_count"] == 10
+
+    # 4. Upload banking answer key test cases
+    with open("data/answer_key/banking_answer_key.json", "rb") as f:
+        resp = client.post("/api/upload", files={"cases_file": ("banking_answer_key.json", f, "application/json")})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cases_count"] >= 10
+
+
+def test_banking_end_to_end_pipeline(client: TestClient) -> None:
+    # Load banking requirements
+    with open("data/requirements/banking_requirements.json", "r", encoding="utf-8") as f:
+        reqs = json.load(f)[:5]
+
+    # 1. Analyze banking requirements
+    analyze_resp = client.post(
+        "/api/requirements/analyze",
+        json={"requirements": reqs, "domain": "banking/retail/checking", "agent_mode": "mock"},
+    )
+    assert analyze_resp.status_code == 200
+    analysis_data = analyze_resp.json()
+    assert len(analysis_data["analyses"]) == len(reqs)
+    assert "priority" in analysis_data["analyses"][0]
+    assert analysis_data["summary"]["mean_score"] > 0.70
+
+    # 2. Generate candidate test cases for banking
+    gen_resp = client.post(
+        "/api/requirements/generate-cases",
+        json={"requirements": reqs, "domain": "banking/retail/checking", "agent_mode": "mock"},
+    )
+    assert gen_resp.status_code == 200
+    gen_data = gen_resp.json()
+    assert len(gen_data["cases"]) >= len(reqs)
+    assert all(c["type"] in ("Positive", "Negative", "Boundary") for c in gen_data["cases"])
+
+    # 3. Run Verdict Gate evaluation on generated banking test cases
+    eval_resp = client.post(
+        "/api/evaluate",
+        json={
+            "cases": gen_data["cases"],
+            "requirements": reqs,
+            "domain": "banking/retail/checking",
+            "agent_mode": "mock",
+        },
+    )
+    assert eval_resp.status_code == 200
+    eval_data = eval_resp.json()
+    assert "summary" in eval_data
+    assert len(eval_data["gate_results"]) == len(gen_data["cases"])
+    # Verify structured 5-dimension decision analysis
+    first_res = eval_data["gate_results"][0]
+    assert "analysis" in first_res
+    assert first_res["analysis"]["why_approved"] or first_res["analysis"]["why_rejected"]
+
+    # 4. Verify review export for banking
+    exp_resp = client.post(
+        "/api/requirements/export/csv",
+        json={
+            "requirements": reqs,
+            "analyses": analysis_data["analyses"],
+            "domain": "banking/retail/checking",
+            "agent_mode": "mock",
+        },
+    )
+    assert exp_resp.status_code == 200
+    assert "BANK-REQ-001" in exp_resp.text
+
+
+
