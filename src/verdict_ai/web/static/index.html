@@ -208,6 +208,36 @@
           </button>
         </div>
       </div>
+
+      <!-- In-Progress Processing Banner -->
+      <div id="evalInProgressBanner" class="hidden mt-4 p-4 rounded-xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 shadow-sm transition-all duration-300">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="relative flex items-center justify-center p-2 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+              <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+              <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
+              </span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span>Gatekeeper Analysis in progress...</span>
+                </h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-500/20">Active</span>
+              </div>
+              <p class="text-[11.5px] text-muted-foreground mt-0.5 font-medium">
+                Please wait until the page refreshes with the evaluated verdicts. Executing multi-agent consensus, boundary verification, and domain static rules.
+              </p>
+            </div>
+          </div>
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background/80 border border-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-xs font-mono font-bold shrink-0">
+            <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+            <span>Evaluating...</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Inputs Workspace: Requirements & Test Cases Tabs -->
@@ -247,6 +277,18 @@
 
             <button onclick="clearRequirements()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
           </div>
+        </div>
+
+        <!-- Requirement Analysis In-Progress Banner -->
+        <div id="reqAnalysisProgressBanner" class="hidden mb-2.5 p-3 rounded-lg border border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-950/30 flex items-center justify-between gap-3 text-xs transition-all shadow-xs">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="loader-2" class="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-spin shrink-0"></i>
+            <div>
+              <span class="font-bold text-foreground">Analyzing requirements quality & ambiguities...</span>
+              <p class="text-[11px] text-muted-foreground mt-0.5">Please wait until the page refreshes with the quality score and issue breakdown.</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold shrink-0">Analyzing</span>
         </div>
 
         <!-- Requirements Analysis KPI summary bar -->
@@ -296,6 +338,18 @@
             </button>
             <button onclick="clearCases()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
           </div>
+        </div>
+
+        <!-- Test Case Generation In-Progress Banner -->
+        <div id="testGenProgressBanner" class="hidden mb-2.5 p-3 rounded-lg border border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-center justify-between gap-3 text-xs transition-all shadow-xs">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="loader-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-spin shrink-0"></i>
+            <div>
+              <span class="font-bold text-foreground">Synthesizing candidate test cases...</span>
+              <p class="text-[11px] text-muted-foreground mt-0.5">Please wait until the page refreshes with generated positive, negative, and boundary tests.</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">Synthesizing</span>
         </div>
         <div id="caseContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
           <div class="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6 border-2 border-dashed border-border/80 rounded-lg">
@@ -640,7 +694,10 @@
       const btn = document.getElementById('analyzeReqsBtn');
       const orig = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i><span>Analyzing...</span>`;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin text-indigo-500"></i><span>Analyzing...</span>`;
+      const banner = document.getElementById('reqAnalysisProgressBanner');
+      if (banner) banner.classList.remove('hidden');
+      showToast('Analyzing requirements quality. Please wait until the page refreshes...', 'info');
       lucide.createIcons();
 
       try {
@@ -682,6 +739,7 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
+        if (banner) banner.classList.add('hidden');
         lucide.createIcons();
       }
     }
@@ -694,7 +752,10 @@
       const btn = document.getElementById('generateCasesBtn');
       const orig = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i><span>Generating...</span>`;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin text-emerald-500"></i><span>Generating...</span>`;
+      const banner = document.getElementById('testGenProgressBanner');
+      if (banner) banner.classList.remove('hidden');
+      showToast('Synthesizing candidate test cases. Please wait until the page refreshes...', 'info');
       lucide.createIcons();
 
       try {
@@ -720,6 +781,7 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
+        if (banner) banner.classList.add('hidden');
         lucide.createIcons();
       }
     }
@@ -948,7 +1010,14 @@
       const runBtn = document.getElementById('runBtn');
       const origContent = runBtn.innerHTML;
       runBtn.disabled = true;
-      runBtn.innerHTML = `<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Analyzing...</span>`;
+      runBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Analyzing...</span>`;
+      
+      const inProgressBanner = document.getElementById('evalInProgressBanner');
+      if (inProgressBanner) {
+        inProgressBanner.classList.remove('hidden');
+        inProgressBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      showToast('Evaluation in progress. Please wait until the page refreshes with verdicts...', 'info');
       lucide.createIcons();
 
       const payload = {
@@ -988,6 +1057,9 @@
       } finally {
         runBtn.disabled = false;
         runBtn.innerHTML = origContent;
+        if (inProgressBanner) {
+          inProgressBanner.classList.add('hidden');
+        }
         lucide.createIcons();
       }
     }
