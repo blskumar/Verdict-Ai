@@ -23,10 +23,11 @@ _USER_TMPL = """\
 Domain context:
 {context}
 
-For each requirement below, draft test cases covering at least:
-- One Positive case (happy path)
-- One Negative case (invalid input or boundary violation)
-- One Boundary case if numeric thresholds are involved
+For each requirement below, draft test cases covering all recommended scenarios:
+- One Positive case (standard valid inputs and happy path)
+- One Negative case (invalid input, missing field, or error handling)
+- One Boundary case (threshold limits, boundary edges, zero, or max values)
+- One Security case (unauthorized access, role bypass, tampering, or compliance rule)
 
 Return a JSON array — one object per requirement:
 [
@@ -34,7 +35,7 @@ Return a JSON array — one object per requirement:
     "req_id": "<id>",
     "cases": [
       {{
-        "type": "Positive|Negative|Boundary|Calculation",
+        "type": "Positive|Negative|Boundary|Security|Calculation",
         "scenario": "<one sentence: given X when Y>",
         "expected": "<specific, measurable outcome>"
       }}

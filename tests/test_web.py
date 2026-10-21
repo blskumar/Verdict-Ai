@@ -357,7 +357,7 @@ def test_banking_end_to_end_pipeline(client: TestClient) -> None:
     assert gen_resp.status_code == 200
     gen_data = gen_resp.json()
     assert len(gen_data["cases"]) >= len(reqs)
-    assert all(c["type"] in ("Positive", "Negative", "Boundary") for c in gen_data["cases"])
+    assert all(c["type"] in ("Positive", "Negative", "Boundary", "Security", "Calculation") for c in gen_data["cases"])
 
     # 3. Run Verdict Gate evaluation on generated banking test cases
     eval_resp = client.post(
@@ -390,6 +390,65 @@ def test_banking_end_to_end_pipeline(client: TestClient) -> None:
     )
     assert exp_resp.status_code == 200
     assert "BANK-REQ-001" in exp_resp.text
+
+
+def test_recommended_scenarios_and_case_generation_counts_match(client: TestClient) -> None:
+    """Verify that candidate test cases count equals recommended scenarios count for every requirement."""
+    # Test high-risk requirement exactly like user's PNC-REQ-001
+    test_reqs = [
+        {
+            "id": "PNC-REQ-001",
+            "title": "Capture Applicant and Vehicle Details",
+            "text": "As a quote applicant, I want to enter applicant, garaging, and vehicle details so that system validates eligibility.",
+            "acceptance_criteria": "business rules: - Required applicant fields: first name, last name, DOB, garaging address, VIN 17 characters.",
+            "risk": "high",
+            "domain": "insurance/p-and-c/commercial-auto",
+        },
+        {
+            "id": "BANK-REQ-001",
+            "title": "Checking Account Minimum Opening Deposit",
+            "text": "Opening deposit of at least $25.00 via verified debit or ACH.",
+            "acceptance_criteria": "Deposit >= $25.00 accepted, < $25.00 declined.",
+            "risk": "medium",
+            "domain": "banking/retail/checking",
+        },
+    ]
+
+    for repeat in range(3):
+        # 1. Analyze
+        analyze_resp = client.post(
+            "/api/requirements/analyze",
+            json={"requirements": test_reqs, "domain": "insurance/p-and-c/commercial-auto", "agent_mode": "mock"},
+        )
+        assert analyze_resp.status_code == 200
+        analysis_data = analyze_resp.json()
+        analyses = {a["req_id"]: a for a in analysis_data["analyses"]}
+
+        # PNC-REQ-001 (high risk with numbers) has exactly 4 recommended scenarios
+        assert len(analyses["PNC-REQ-001"]["suggested_scenarios"]) == 4
+
+        # 2. Generate cases
+        gen_resp = client.post(
+            "/api/requirements/generate-cases",
+            json={"requirements": test_reqs, "domain": "insurance/p-and-c/commercial-auto", "agent_mode": "mock"},
+        )
+        assert gen_resp.status_code == 200
+        cases = gen_resp.json()["cases"]
+
+        cases_by_req = {}
+        for c in cases:
+            cases_by_req.setdefault(c["requirement_id"], []).append(c)
+
+        # For every requirement, candidate cases count MUST match recommended scenario count
+        for r in test_reqs:
+            rid = r["id"]
+            rec_count = len(analyses[rid]["suggested_scenarios"])
+            gen_cases = cases_by_req[rid]
+            assert len(gen_cases) == rec_count, f"Repeat {repeat}: {rid} recommended {rec_count} scenarios but generated {len(gen_cases)} cases"
+            # Verify case numbering starts from 01 per requirement
+            expected_ids = [f"TC-{rid}-{i:02d}" for i in range(1, rec_count + 1)]
+            assert [c["id"] for c in gen_cases] == expected_ids
+
 
 
 

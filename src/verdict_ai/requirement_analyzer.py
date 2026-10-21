@@ -218,7 +218,7 @@ def analyze_requirement(
     )
 
 
-def _derive_suggested_scenarios(req: Requirement, risk: str) -> list[dict[str, str]]:
+def derive_suggested_scenarios(req: Requirement, risk: str) -> list[dict[str, str]]:
     """Derive standard recommended test scenario blueprints for this requirement."""
     title_short = req.title if len(req.title) < 50 else req.title[:47] + "..."
     scenarios: list[dict[str, str]] = [
@@ -250,6 +250,9 @@ def _derive_suggested_scenarios(req: Requirement, risk: str) -> list[dict[str, s
         })
 
     return scenarios
+
+
+_derive_suggested_scenarios = derive_suggested_scenarios
 
 
 def analyze_requirements(

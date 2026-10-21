@@ -1117,11 +1117,11 @@
 
         if (!res.ok) {
           let errMsg = `Evaluation request failed (HTTP ${res.status})`;
+          const rawText = await res.text().catch(() => '');
           try {
-            const err = await res.json();
+            const err = JSON.parse(rawText);
             errMsg = err.detail || errMsg;
           } catch (_) {
-            const rawText = await res.text();
             if (rawText) errMsg = rawText.slice(0, 300);
           }
           throw new Error(errMsg);

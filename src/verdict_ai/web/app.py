@@ -31,6 +31,7 @@ from verdict_ai.requirement_analyzer import (
     RequirementAnalysis,
     RequirementIssue,
     analyze_requirements,
+    derive_suggested_scenarios,
     parse_raw_requirements_text,
     requirements_review_to_csv,
     requirements_review_to_html,
@@ -202,25 +203,17 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
                 target_reqs = [r for r in reqs if r.id in batch_req_ids] if batch_req_ids else reqs
                 gen_data = []
                 for r in target_reqs:
+                    derived = derive_suggested_scenarios(r, r.risk or "medium")
+                    cases_for_r = []
+                    for s in derived:
+                        cases_for_r.append({
+                            "type": s["type"],
+                            "scenario": s["scenario"],
+                            "expected": s.get("expected") or "System executes strictly per requirement criteria.",
+                        })
                     gen_data.append({
                         "req_id": r.id,
-                        "cases": [
-                            {
-                                "type": "Positive",
-                                "scenario": f"Given standard valid inputs for {r.title}, when action is executed.",
-                                "expected": "System successfully verifies inputs, applies logic, and completes action per specification."
-                            },
-                            {
-                                "type": "Negative",
-                                "scenario": f"Given missing required field or malformed parameter for {r.title}, when submitted.",
-                                "expected": "System declines request with validation alert and preserves previous state."
-                            },
-                            {
-                                "type": "Boundary",
-                                "scenario": f"Given threshold edge value for {r.title}, when processed.",
-                                "expected": "System accurately adheres to boundary limit without rounding or overflow."
-                            }
-                        ]
+                        "cases": cases_for_r,
                     })
                 return json.dumps(gen_data), "mock-generator"
             return "[]", "mock-model"
@@ -279,7 +272,7 @@ def _build_decision_analysis(
             why_rejected="No outright defect detected, but conflicting check scores or borderline confidence require human adjudication.",
             human_review_actions=(
                 f"Borderline score ({mean_score:.2f}) or dispute flagged: {reasons_text}. "
-                "Human auditor must review business risk and manually override verdict to Approve, Revise, or Reject.",
+                "Human auditor must review business risk and manually override verdict to Approve, Revise, or Reject."
             ),
             human_discretion_grounds="Underwriting risk appetite, regulatory compliance judgment, and business exception policy discretion.",
         )
@@ -595,21 +588,41 @@ def create_app() -> FastAPI:
 
         raw_generated = run_generator(router, req_models, context=domain_context)
 
-        generated_cases: list[dict[str, Any]] = []
-        case_counter = 1
+        # Build map of generated cases by requirement id
+        raw_by_req: dict[str, list[dict[str, Any]]] = {}
         for item in raw_generated:
-            req_id = item.get("req_id")
-            for c in item.get("cases", []):
-                case_id = f"TC-{req_id}-{case_counter:02d}"
-                case_counter += 1
+            r_id = str(item.get("req_id", ""))
+            raw_by_req[r_id] = item.get("cases", [])
+
+        generated_cases: list[dict[str, Any]] = []
+        for r in req_models:
+            recommended = derive_suggested_scenarios(r, r.risk or "medium")
+            cases_for_r = raw_by_req.get(r.id, [])
+
+            # Ensure all recommended scenarios are covered; if generator omitted any,
+            # supplement from the recommended scenarios so the numbers add up exactly
+            existing_types = {c.get("type") for c in cases_for_r}
+            final_cases_list = list(cases_for_r)
+            for rec in recommended:
+                if rec["type"] not in existing_types:
+                    final_cases_list.append({
+                        "type": rec["type"],
+                        "scenario": rec["scenario"],
+                        "expected": rec.get("expected", "System behaves strictly according to specification."),
+                    })
+                    existing_types.add(rec["type"])
+
+            # Number test cases starting from 01 for this specific requirement
+            for idx, c in enumerate(final_cases_list, start=1):
+                case_id = f"TC-{r.id}-{idx:02d}"
                 case_type = c.get("type", "Positive")
                 if case_type not in ("Positive", "Negative", "Boundary", "Calculation", "Security"):
                     case_type = "Positive"
                 generated_cases.append({
                     "id": case_id,
-                    "requirement_id": req_id,
+                    "requirement_id": r.id,
                     "type": case_type,
-                    "scenario": c.get("scenario", f"Verify requirement {req_id} behavior."),
+                    "scenario": c.get("scenario", f"Verify requirement {r.id} behavior."),
                     "expected": c.get("expected", "System behaves strictly according to specification."),
                     "source": "generated",
                 })
