@@ -20,7 +20,7 @@ from verdict_ai.agents.analyst import run_analyst
 from verdict_ai.agents.arbiter import run_arbiter
 from verdict_ai.agents.checker import run_checker
 from verdict_ai.agents.reviewer import run_reviewer
-from verdict_ai.llm import AllModelsExhausted, ModelRouter
+from verdict_ai.llm import AllModelsExhausted, AuthenticationError, ModelRouter
 from verdict_ai.models import CheckResult, Requirement, TestCase
 
 # Default batch sizes (overridable per run)
@@ -44,6 +44,7 @@ class RunResult:
     checker_results: list[CheckResult] = field(default_factory=list)
     arbiter_results: list[CheckResult] = field(default_factory=list)
     exhausted_case_ids: list[str] = field(default_factory=list)  # models ran out
+    auth_error: str | None = None  # Authentication error details if occurred
 
     def all_checks(self) -> list[CheckResult]:
         """Flat list: arbiter results replace reviewer/checker for disputed cases."""
@@ -81,47 +82,91 @@ class Orchestrator:
         result = RunResult()
         bs = self.cfg.batch_size
 
+        # Load from resume_path if available
+        if self.cfg.resume_path and Path(self.cfg.resume_path).exists():
+            try:
+                res_data = json.loads(Path(self.cfg.resume_path).read_text(encoding="utf-8"))
+                result.analyst_results = [CheckResult(**d) for d in res_data.get("analyst", [])]
+                result.reviewer_results = [CheckResult(**d) for d in res_data.get("reviewer", [])]
+                result.checker_results = [CheckResult(**d) for d in res_data.get("checker", [])]
+                result.arbiter_results = [CheckResult(**d) for d in res_data.get("arbiter", [])]
+                result.exhausted_case_ids = list(res_data.get("exhausted", []))
+            except Exception:
+                pass
+
         def _progress(msg: str) -> None:
             if on_progress:
                 on_progress(msg)
 
         # ── Stage 1: analyst ───────────────────────────────────────────────
         if self.cfg.run_analyst and reqs:
-            _progress(f"analyst: reviewing {len(reqs)} requirements …")
-            try:
-                result.analyst_results = run_analyst(
-                    self.router, reqs, context=context, batch_size=bs
-                )
-            except AllModelsExhausted:
-                _progress("analyst: all models exhausted — skipping requirement review.")
-            self._save_progress(result)
+            if not result.analyst_results:
+                _progress(f"analyst: reviewing {len(reqs)} requirements …")
+                try:
+                    result.analyst_results = run_analyst(
+                        self.router, reqs, context=context, batch_size=bs
+                    )
+                except AuthenticationError as e:
+                    result.auth_error = str(e)
+                    _progress(f"analyst: {e}")
+                except AllModelsExhausted:
+                    _progress("analyst: all models exhausted — skipping requirement review.")
+                self._save_progress(result)
+            else:
+                _progress(f"analyst: resumed {len(result.analyst_results)} requirements from saved progress.")
 
         # ── Stage 2: reviewer ──────────────────────────────────────────────
         _progress(f"reviewer: reviewing {len(cases)} cases …")
-        reviewer_done: list[CheckResult] = []
+        reviewer_done: list[CheckResult] = list(result.reviewer_results)
         exhausted_ids: list[str] = []
-        for i in range(0, len(cases), bs):
-            batch = cases[i : i + bs]
+        already_reviewed = {r.case_id for r in reviewer_done}
+        cases_to_review = [c for c in cases if c.id not in already_reviewed]
+
+        for i in range(0, len(cases_to_review), bs):
+            batch = cases_to_review[i : i + bs]
+            if result.auth_error:
+                exhausted_ids.extend(c.id for c in batch)
+                continue
             try:
                 reviewer_done.extend(
                     run_reviewer(self.router, batch, reqs, context=context, batch_size=bs)
                 )
+            except AuthenticationError as e:
+                result.auth_error = str(e)
+                exhausted_ids.extend(c.id for c in batch)
+                _progress(f"reviewer: {e} — aborting remaining live calls.")
             except AllModelsExhausted:
                 exhausted_ids.extend(c.id for c in batch)
                 _progress(f"reviewer: models exhausted on batch {i // bs + 1} — {len(batch)} cases marked exhausted.")
         result.reviewer_results = reviewer_done
-        result.exhausted_case_ids.extend(exhausted_ids)
+        for cid in exhausted_ids:
+            if cid not in result.exhausted_case_ids:
+                result.exhausted_case_ids.append(cid)
         self._save_progress(result)
 
         # ── Stage 3: checker ───────────────────────────────────────────────
         _progress(f"checker: checking {len(cases)} cases …")
-        checker_done: list[CheckResult] = []
-        for i in range(0, len(cases), bs):
-            batch = cases[i : i + bs]
+        checker_done: list[CheckResult] = list(result.checker_results)
+        already_checked = {c.case_id for c in checker_done}
+        cases_to_check = [c for c in cases if c.id not in already_checked]
+
+        for i in range(0, len(cases_to_check), bs):
+            batch = cases_to_check[i : i + bs]
+            if result.auth_error:
+                for c in batch:
+                    if c.id not in result.exhausted_case_ids:
+                        result.exhausted_case_ids.append(c.id)
+                continue
             try:
                 checker_done.extend(
                     run_checker(self.router, batch, reqs, context=context, batch_size=bs)
                 )
+            except AuthenticationError as e:
+                result.auth_error = str(e)
+                for c in batch:
+                    if c.id not in result.exhausted_case_ids:
+                        result.exhausted_case_ids.append(c.id)
+                _progress(f"checker: {e} — aborting remaining live calls.")
             except AllModelsExhausted:
                 for c in batch:
                     if c.id not in result.exhausted_case_ids:
@@ -131,7 +176,7 @@ class Orchestrator:
         self._save_progress(result)
 
         # ── Stage 4: arbiter (disputed only) ───────────────────────────────
-        if self.cfg.run_arbiter and result.reviewer_results and result.checker_results:
+        if self.cfg.run_arbiter and result.reviewer_results and result.checker_results and not result.auth_error:
             disputed_count = _count_disputes(result.reviewer_results, result.checker_results)
             if disputed_count:
                 _progress(f"arbiter: resolving {disputed_count} disputed cases …")
@@ -145,6 +190,9 @@ class Orchestrator:
                         context=context,
                         batch_size=bs,
                     )
+                except AuthenticationError as e:
+                    result.auth_error = str(e)
+                    _progress(f"arbiter: {e}")
                 except AllModelsExhausted:
                     _progress("arbiter: all models exhausted — disputed cases left unresolved.")
                 self._save_progress(result)

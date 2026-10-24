@@ -8,4 +8,6 @@ verdict-ai-phase1.zip
 .cache/
 /Expanded_Insurance_*.pdf
 /Sample_PnC_*
+build/
+dist/
 

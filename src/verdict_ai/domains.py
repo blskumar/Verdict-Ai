@@ -38,12 +38,12 @@ class Pack(BaseModel):
 
 def default_root() -> Path:
     here = Path(__file__).resolve()
-    for base in (Path.cwd(), *here.parents):
-        if (base / "domains").is_dir():
-            return base / "domains"
     pkg_domains = here.parent / "domains"
     if pkg_domains.is_dir():
         return pkg_domains
+    for base in (Path.cwd(), *here.parents):
+        if (base / "domains").is_dir():
+            return base / "domains"
     raise DomainError("No 'domains' folder found. Run from the project folder or pass --domains-dir.")
 
 

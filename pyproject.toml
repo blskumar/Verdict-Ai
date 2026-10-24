@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "playwright>=1.40"]
 
 [project.scripts]
 verdict-ai = "verdict_ai.cli:app"

@@ -399,3 +399,42 @@ def test_checker_missing_case_falls_back_neutral():
 def test_case_type_security():
     assert CaseType.security.value == "Security"
     assert CaseType("Security") == CaseType.security
+
+
+def test_reviewer_omitted_middle_case_does_not_inherit_positional_result():
+    # If cases are A, B, C and model replies for A and C, B must NOT get C's verdict
+    cases = [_case("TC-A"), _case("TC-B"), _case("TC-C")]
+    reqs = [_req()]
+    reply = json.dumps([
+        {"case_id": "TC-A", "passed": True, "score": 0.95, "reason": "A is good."},
+        {"case_id": "TC-C", "passed": False, "score": 0.30, "reason": "C is defective."},
+    ])
+    router = _mock_router(reply, "reviewer")
+    results = run_reviewer(router, cases, reqs)
+    res_map = {r.case_id: r for r in results}
+    assert res_map["TC-A"].score == pytest.approx(0.95)
+    # B was omitted: must be neutral (0.5), NOT C's score (0.30)
+    assert res_map["TC-B"].score == pytest.approx(0.5)
+    assert "No evaluation returned" in res_map["TC-B"].reason
+    assert res_map["TC-C"].score == pytest.approx(0.30)
+
+
+def test_agent_handles_malformed_scores_and_types_safely():
+    cases = [_case("TC-01"), _case("TC-02"), _case("TC-03"), _case("TC-04")]
+    reqs = [_req()]
+    # score out of range (1.5), score string ('high'), score None, and unhashable case_id
+    reply = json.dumps([
+        {"case_id": "TC-01", "passed": True, "score": 1.5, "reason": "Clamped to 1.0"},
+        {"case_id": "TC-02", "passed": True, "score": "high", "reason": "Invalid score defaulted"},
+        {"case_id": "TC-03", "passed": True, "score": None, "reason": "Null score defaulted"},
+        {"case_id": ["TC-04"], "passed": False, "score": 0.1, "reason": "List case_id ignored"},
+    ])
+    router = _mock_router(reply, "reviewer")
+    results = run_reviewer(router, cases, reqs)
+    res_map = {r.case_id: r for r in results}
+    assert res_map["TC-01"].score == pytest.approx(1.0)
+    assert res_map["TC-02"].score == pytest.approx(0.5)
+    assert res_map["TC-03"].score == pytest.approx(0.5)
+    # TC-04 had unhashable id in reply so treated as neutral
+    assert res_map["TC-04"].score == pytest.approx(0.5)
+

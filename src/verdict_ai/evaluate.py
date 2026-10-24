@@ -177,6 +177,7 @@ def run_evaluation(
     agent_mode: Literal["mock", "live"] = "mock",
     use_rules: bool = True,
     use_agents: bool = True,
+    resume_path: Path | None = None,
 ) -> EvaluationReport:
     """Run full benchmark bake-off and calculate quality metrics."""
     reqs_file = Path(requirements_path)
@@ -228,7 +229,7 @@ def run_evaluation(
 
         orchestrator = Orchestrator(
             router,
-            OrchestratorConfig(batch_size=10, run_analyst=True, run_arbiter=True),
+            OrchestratorConfig(batch_size=10, run_analyst=True, run_arbiter=True, resume_path=resume_path),
         )
         run_res = orchestrator.run(reqs, all_cases, context=domain_ctx)
         checks = run_res.all_checks()

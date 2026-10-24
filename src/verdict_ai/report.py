@@ -6,6 +6,7 @@ import json
 from html import escape
 from io import StringIO
 from pathlib import Path
+from typing import Any
 
 from verdict_ai.models import GateResult
 
@@ -19,6 +20,19 @@ _ICON: dict[str, str] = {
 
 def _mean_score(r: GateResult) -> float:
     return sum(r.scores.values()) / len(r.scores) if r.scores else 1.0
+
+
+def _md_cell(text: str) -> str:
+    """Escape pipe characters and line breaks for Markdown table cells."""
+    return text.replace("|", "\\|").replace("\r\n", "<br>").replace("\n", "<br>").replace("\r", "<br>")
+
+
+def _csv_cell(val: Any) -> str:
+    """Sanitize CSV cells to prevent Excel formula execution."""
+    s = str(val) if val is not None else ""
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{s}"
+    return s
 
 
 # ------------------------------------------------------------------
@@ -36,9 +50,10 @@ def to_markdown(results: list[GateResult], title: str = "Verdict AI Report") -> 
     ]
     for r in results:
         icon = _ICON.get(r.decision, "❔")
-        reasons = "; ".join(r.reasons) if r.reasons else "—"
+        reasons = "; ".join(_md_cell(x) for x in r.reasons) if r.reasons else "—"
+        case_id_safe = _md_cell(r.case_id)
         lines.append(
-            f"| `{r.case_id}` | {icon} {r.decision} | {_mean_score(r):.2f} | {reasons} |"
+            f"| `{case_id_safe}` | {icon} {r.decision} | {_mean_score(r):.2f} | {reasons} |"
         )
     if any(r.models_used for r in results):
         lines += ["", "## Models used", ""]
@@ -114,11 +129,11 @@ def to_csv(results: list[GateResult]) -> str:
     w.writerow(["case_id", "decision", "score_mean", "reasons", "models_used"])
     for r in results:
         w.writerow([
-            r.case_id,
-            r.decision,
+            _csv_cell(r.case_id),
+            _csv_cell(r.decision),
             f"{_mean_score(r):.4f}",
-            " | ".join(r.reasons),
-            ", ".join(r.models_used),
+            _csv_cell(" | ".join(r.reasons)),
+            _csv_cell(", ".join(r.models_used)),
         ])
     return buf.getvalue()
 

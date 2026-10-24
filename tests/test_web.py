@@ -284,8 +284,8 @@ def test_api_cases_export_grouped(client: TestClient) -> None:
     resp_csv = client.post("/api/cases/export/csv", json=cases)
     assert resp_csv.status_code == 200
     csv_text = resp_csv.text
-    assert "=== REQUIREMENT: REQ-A (2 test cases) ===" in csv_text
-    assert "=== REQUIREMENT: REQ-B (1 test cases) ===" in csv_text
+    assert "REQUIREMENT: REQ-A (2 test cases)" in csv_text
+    assert "REQUIREMENT: REQ-B (1 test cases)" in csv_text
     # Verify break between groups
     lines = csv_text.splitlines()
     assert any(line.strip() == "" for line in lines)
@@ -525,6 +525,59 @@ def test_api_upload_file_size_limit(client: TestClient) -> None:
         files={"file": ("large.json", BytesIO(large_payload), "application/json")},
     )
     assert resp.status_code == 413
+
+
+def test_api_export_missing_case_id_handling(client: TestClient) -> None:
+    resp = client.post(
+        "/api/export/json",
+        json={"results": [{"decision": "approve"}]},  # Missing case_id
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert "case_id" in data[0]
+
+
+def test_api_cases_export_csv_formula_sanitization(client: TestClient) -> None:
+    cases = [
+        {
+            "id": "=HYPERLINK('http://evil.com')",
+            "requirement_id": "@SUM(1+1)",
+            "type": "Positive",
+            "scenario": "+cmd|' /C calc'!A0",
+            "expected": "-DDE('cmd';'';'calc')",
+        }
+    ]
+    resp = client.post("/api/cases/export/csv", json=cases)
+    assert resp.status_code == 200
+    csv_text = resp.text
+    # Check that leading characters are neutralized with leading single quote
+    assert "'=HYPERLINK" in csv_text
+    assert "'@SUM" in csv_text
+    assert "'+cmd" in csv_text
+    assert "'-DDE" in csv_text
+    # Ensure header row has no leading '='
+    assert "=== REQUIREMENT" not in csv_text
+    assert "REQUIREMENT: '@SUM(1+1)" in csv_text
+
+
+def test_markdown_report_pipe_and_newline_escaping() -> None:
+    from verdict_ai.models import GateResult
+    from verdict_ai.report import to_markdown
+    res = [
+        GateResult(
+            case_id="TC-01",
+            decision="reject",
+            reasons=["broken | pipe\nand newline"],
+            scores={"reviewer": 0.2},
+            models_used=[],
+        )
+    ]
+    md = to_markdown(res)
+    assert "\\|" in md
+    assert "<br>" in md
+    assert "\nand newline" not in md
+
 
 
 

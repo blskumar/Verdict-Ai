@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 from verdict_ai import domains as d
 from verdict_ai.cli import app
 
-ROOT = Path(__file__).resolve().parents[1] / "domains"
+ROOT = d.default_root()
 
 
 def test_tree_has_two_branches():
@@ -55,10 +55,11 @@ def test_prefix_to_domain():
 
 
 def test_cli_domains_list_and_load():
+    repo_root = Path(__file__).resolve().parents[1]
     r = CliRunner()
     out = r.invoke(app, ["domains", "list"])
     assert out.exit_code == 0 and "insurance/life/term" in out.output
-    out = r.invoke(app, ["load", "-r", str(ROOT.parent / "data/requirements/insurance_requirements.pdf"),
+    out = r.invoke(app, ["load", "-r", str(repo_root / "data/requirements/insurance_requirements.pdf"),
                          "-d", "insurance/life"])
     assert out.exit_code == 0 and "25 requirements" in out.output
     out = r.invoke(app, ["load", "-r", "x.pdf", "-d", "banking"])

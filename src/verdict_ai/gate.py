@@ -26,10 +26,11 @@ class GateEngine:
         domain_thresholds: dict | None = None,
     ) -> None:
         config_file = Path(config_path)
-        if not config_file.exists():
-            pkg_fallback = Path(__file__).resolve().parent / "gate.yaml"
-            if pkg_fallback.exists():
-                config_file = pkg_fallback
+        pkg_fallback = Path(__file__).resolve().parent / "gate.yaml"
+        if config_path == "gate.yaml" and pkg_fallback.exists():
+            config_file = pkg_fallback
+        elif not config_file.exists() and pkg_fallback.exists():
+            config_file = pkg_fallback
 
         if config_file.exists():
             with open(config_file, encoding="utf-8") as f:
@@ -98,7 +99,7 @@ class GateEngine:
             if not c.passed:
                 reasons.append(c.reason)
                 # Infer decision from score
-                if c.score < self.revise_max:
+                if c.score < self.human_review_min:
                     inferred: Decision = "revise"
                 elif c.score < self.approve_threshold:
                     inferred = "human_review"
@@ -115,7 +116,7 @@ class GateEngine:
 
         if best_decision == "approve":
             # No explicit trigger → fall through to score thresholds
-            if overall < self.revise_max:
+            if overall < self.human_review_min:
                 best_decision = "revise"
             elif overall < self.approve_threshold:
                 best_decision = "human_review"

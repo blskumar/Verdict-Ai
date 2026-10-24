@@ -99,6 +99,7 @@ def evaluate(
     threshold: float = typer.Option(0.85, "--threshold", "-t"),
     mode: str = typer.Option("mock", "--mode", "-m", help="Evaluation mode: mock or live"),
     output_dir: Path = typer.Option("runs", "--output-dir", "-o"),
+    resume: Path | None = typer.Option(None, "--resume", help="Path to resume file for checkpointing"),
 ) -> None:
     """Run benchmark bake-off over answer_key and seeded_bad test cases."""
     from .evaluate import format_markdown_report, run_evaluation, save_evaluation
@@ -111,6 +112,7 @@ def evaluate(
             domain=domain,
             approve_threshold=threshold,
             agent_mode="mock" if mode == "mock" else "live",
+            resume_path=resume,
         )
         json_p, md_p = save_evaluation(report, output_dir=output_dir)
         typer.echo(format_markdown_report(report))

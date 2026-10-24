@@ -107,21 +107,33 @@ def run_arbiter(
         ]
         raw, model = router.chat(ROLE, messages)
         parsed = _parse(raw, batch)
-        parsed_by_id = {item["case_id"]: item for item in parsed if isinstance(item, dict) and "case_id" in item}
-        for idx, case in enumerate(batch):
+        parsed_by_id = {}
+        for item in parsed:
+            if isinstance(item, dict) and "case_id" in item and isinstance(item["case_id"], (str, int)):
+                parsed_by_id[str(item["case_id"])] = item
+
+        for case in batch:
             if case.id in parsed_by_id:
                 item = parsed_by_id[case.id]
-            elif idx < len(parsed) and isinstance(parsed[idx], dict):
-                item = parsed[idx]
+                try:
+                    score_val = float(item.get("score", 0.72))
+                    score_val = max(0.0, min(1.0, score_val))
+                except (ValueError, TypeError):
+                    score_val = 0.72
+                passed_val = bool(item.get("passed", False))
+                reason_val = str(item.get("reason", "Unresolved — flagged for human review."))
             else:
-                item = {"passed": False, "score": 0.72, "reason": "Unresolved — flagged for human review."}
+                passed_val = False
+                score_val = 0.72
+                reason_val = "Unresolved — flagged for human review."
+
             results.append(
                 CheckResult(
                     check_name="arbiter",
                     case_id=case.id,
-                    passed=bool(item.get("passed", False)),
-                    score=float(item.get("score", 0.72)),
-                    reason=str(item.get("reason", "Unresolved — flagged for human review.")),
+                    passed=passed_val,
+                    score=score_val,
+                    reason=reason_val,
                     source="model",
                     model_name=model,
                 )

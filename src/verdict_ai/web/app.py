@@ -54,6 +54,7 @@ class EvaluateRequest(BaseModel):
     use_rules: bool = True
     use_agents: bool = True
     agent_mode: Literal["mock", "live"] = "mock"
+    resume_path: str | None = None
 
 
 class RecognizeRequest(BaseModel):
@@ -126,7 +127,7 @@ class EvaluateResponse(BaseModel):
 
 class ExportRequest(BaseModel):
     results: list[dict[str, Any]]
-    format: Literal["json", "csv", "md", "html"]
+    format: Literal["json", "csv", "md", "html"] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -434,18 +435,29 @@ def create_app() -> FastAPI:
         parsed_reqs: list[dict[str, Any]] = []
         parsed_cases: list[dict[str, Any]] = []
 
+        if files and len(files) > 10:
+            raise HTTPException(status_code=400, detail="Maximum 10 files allowed per upload request.")
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             async def _process_upload(f: UploadFile, preferred_type: str | None = None):
                 if not f or not f.filename:
                     return
                 safe_name = Path(f.filename).name
-                content = await f.read()
-                if not content:
-                    return
-                if len(content) > 25 * 1024 * 1024:
-                    raise HTTPException(status_code=413, detail=f"File '{safe_name}' exceeds maximum allowed upload size (25MB).")
                 tmp_path = Path(tmp_dir) / safe_name
-                tmp_path.write_bytes(content)
+                max_bytes = 25 * 1024 * 1024
+                total_read = 0
+                with open(tmp_path, "wb") as out_f:
+                    while True:
+                        chunk = await f.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        total_read += len(chunk)
+                        if total_read > max_bytes:
+                            raise HTTPException(status_code=413, detail=f"File '{safe_name}' exceeds maximum allowed upload size (25MB).")
+                        out_f.write(chunk)
+
+                if total_read == 0:
+                    return
 
                 if preferred_type == "requirements":
                     try:
@@ -585,9 +597,14 @@ def create_app() -> FastAPI:
         else:
             router = ModelRouter()
 
+        warning: str | None = None
+        is_fallback = False
         try:
             raw_generated = run_generator(router, req_models, context=domain_context)
-        except Exception:
+        except Exception as exc:
+            if req.agent_mode == "live":
+                is_fallback = True
+                warning = f"Live generation failed ({exc}); synthesized cases from domain heuristic templates."
             fallback_router = _build_mock_router_for_evaluation([], req_models)
             raw_generated = run_generator(fallback_router, req_models, context=domain_context)
 
@@ -612,6 +629,7 @@ def create_app() -> FastAPI:
                         "type": rec["type"],
                         "scenario": rec["scenario"],
                         "expected": rec.get("expected", "System behaves strictly according to specification."),
+                        "is_supplement": True,
                     })
                     existing_types.add(rec["type"])
 
@@ -621,19 +639,23 @@ def create_app() -> FastAPI:
                 case_type = c.get("type", "Positive")
                 if case_type not in ("Positive", "Negative", "Boundary", "Calculation", "Security"):
                     case_type = "Positive"
+                source = "template" if (is_fallback or c.get("is_supplement")) else "generated"
                 generated_cases.append({
                     "id": case_id,
                     "requirement_id": r.id,
                     "type": case_type,
                     "scenario": c.get("scenario", f"Verify requirement {r.id} behavior."),
                     "expected": c.get("expected", "System behaves strictly according to specification."),
-                    "source": "generated",
+                    "source": source,
                 })
 
-        return {
+        resp: dict[str, Any] = {
             "cases": generated_cases,
             "cases_count": len(generated_cases),
         }
+        if warning:
+            resp["warning"] = warning
+        return resp
 
 
     @app.post("/api/evaluate", response_model=EvaluateResponse)
@@ -691,15 +713,17 @@ def create_app() -> FastAPI:
         checks: list[CheckResult] = []
         if req.use_agents:
             run_res = None
+            r_path = Path(req.resume_path) if req.resume_path else None
+            cfg = OrchestratorConfig(run_analyst=True, run_arbiter=True, resume_path=r_path)
             if req.agent_mode == "mock":
                 router = _build_mock_router_for_evaluation(case_models, req_models)
-                orchestrator = Orchestrator(router, OrchestratorConfig(run_analyst=True, run_arbiter=True))
+                orchestrator = Orchestrator(router, cfg)
                 run_res = orchestrator.run(req_models, case_models, context=domain_context)
                 checks = run_res.all_checks()
             else:
                 try:
                     router = ModelRouter()
-                    orchestrator = Orchestrator(router, OrchestratorConfig(run_analyst=True, run_arbiter=True))
+                    orchestrator = Orchestrator(router, cfg)
                     run_res = orchestrator.run(req_models, case_models, context=domain_context)
                     checks = run_res.all_checks()
                 except Exception as exc:
@@ -714,12 +738,13 @@ def create_app() -> FastAPI:
                         ))
 
             if run_res and run_res.exhausted_case_ids:
+                exhausted_reason = run_res.auth_error or "No model could judge this case."
                 for cid in run_res.exhausted_case_ids:
                     findings.append(Finding(
                         case_id=cid,
-                        code="ALL_MODELS_EXHAUSTED",
+                        code="AUTH_FAILURE" if run_res.auth_error else "ALL_MODELS_EXHAUSTED",
                         decision="human_review",
-                        reason="No model could judge this case.",
+                        reason=exhausted_reason,
                         requirement_id=None,
                     ))
 
@@ -728,11 +753,15 @@ def create_app() -> FastAPI:
             for c in case_models:
                 if c.id not in cases_with_model_checks:
                     if not any(f.case_id == c.id and f.decision in ("reject", "revise", "human_review") for f in findings):
+                        unjudged_reason = (
+                            run_res.auth_error if (run_res and run_res.auth_error)
+                            else "No model could judge this case."
+                        )
                         findings.append(Finding(
                             case_id=c.id,
-                            code="UNJUDGED",
+                            code="AUTH_FAILURE" if (run_res and run_res.auth_error) else "UNJUDGED",
                             decision="human_review",
-                            reason="No model could judge this case.",
+                            reason=unjudged_reason,
                             requirement_id=c.requirement_id or None,
                         ))
 
@@ -817,10 +846,14 @@ def create_app() -> FastAPI:
     def export_report(fmt: Literal["json", "csv", "md", "html"], req: ExportRequest) -> Response:
         """Export evaluation results to downloadable file."""
         gate_models: list[GateResult] = []
-        for r in req.results:
+        for idx, r in enumerate(req.results, start=1):
+            cid = str(r.get("case_id") or f"TC-EXPORT-{idx:03d}")
+            dec = r.get("decision")
+            if dec not in ("approve", "revise", "reject", "human_review"):
+                dec = "human_review"
             gate_models.append(GateResult(
-                case_id=r["case_id"],
-                decision=r["decision"],
+                case_id=cid,
+                decision=dec,
                 reasons=r.get("reasons", []),
                 scores=r.get("scores", {}),
                 models_used=r.get("models_used", []),
@@ -857,6 +890,12 @@ def create_app() -> FastAPI:
             rid = str(c.get("requirement_id") or "UNASSIGNED")
             groups.setdefault(rid, []).append(c)
 
+        def _csv_clean(val: Any) -> str:
+            s = str(val) if val is not None else ""
+            if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+                return f"'{s}"
+            return s
+
         if fmt == "json":
             body = json.dumps({"groups": groups, "cases": cases}, indent=2)
             content_type = "application/json"
@@ -869,16 +908,17 @@ def create_app() -> FastAPI:
                 if not first_group:
                     # Provide empty break row between requirement groups
                     w.writerow([])
-                w.writerow([f"=== REQUIREMENT: {rid} ({len(grp)} test cases) ===", "", "", "", "", ""])
+                clean_rid = _csv_clean(rid)
+                w.writerow([f"REQUIREMENT: {clean_rid} ({len(grp)} test cases)", "", "", "", "", ""])
                 first_group = False
                 for c in grp:
                     w.writerow([
-                        c.get("id", ""),
-                        c.get("requirement_id", ""),
-                        c.get("type", ""),
-                        c.get("scenario", ""),
-                        c.get("expected", ""),
-                        c.get("source", "uploaded"),
+                        _csv_clean(c.get("id", "")),
+                        _csv_clean(c.get("requirement_id", "")),
+                        _csv_clean(c.get("type", "")),
+                        _csv_clean(c.get("scenario", "")),
+                        _csv_clean(c.get("expected", "")),
+                        _csv_clean(c.get("source", "uploaded")),
                     ])
             body = buf.getvalue()
             content_type = "text/csv"

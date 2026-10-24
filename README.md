@@ -1,6 +1,5 @@
 # Verdict AI — Test Case Gatekeeper
-
-[![Tests](https://img.shields.io/badge/pytest-93%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/pytest-101%20passed-brightgreen.svg)](tests)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v3-38B2AC.svg)](https://tailwindcss.com/)
@@ -58,10 +57,11 @@ Verdict AI is an automated gatekeeper for software test cases. It inspects candi
 ## Quickstart
 
 ### 1. Installation
+
 ```bash
 # Clone and enter directory
-git clone https://github.com/verdict-ai/verdict-ai.git
-cd verdict-ai
+git clone https://github.com/blskumar/Verdict-Ai.git
+cd Verdict-Ai
 
 # Create virtual environment
 python -m venv .venv
@@ -94,7 +94,7 @@ Reason Compliance:     100.0%         — Target: 100%   [PASS]
 ### 4. Run Pytest Suite
 ```bash
 pytest -q
-# 93 passed, 0 failed
+# 101 passed, 0 failed
 ```
 
 ---
