@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+from html import escape
 from io import StringIO
 from pathlib import Path
 
@@ -52,15 +53,15 @@ def to_html(results: list[GateResult], title: str = "Verdict AI Report") -> str:
     for r in results:
         icon = _ICON.get(r.decision, "❔")
         badge_cls = f"badge-{r.decision.replace('_', '-')}"
-        reasons_html = "<br>".join(r.reasons) if r.reasons else "—"
+        reasons_html = "<br>".join(escape(x) for x in r.reasons) if r.reasons else "—"
         models_html = (
-            f'<br><small class="models">Models: {", ".join(r.models_used)}</small>'
+            f'<br><small class="models">Models: {escape(", ".join(r.models_used))}</small>'
             if r.models_used else ""
         )
         rows_html += (
             f"<tr>"
-            f'<td><code>{r.case_id}</code></td>'
-            f'<td><span class="badge {badge_cls}" aria-label="{r.decision}">'
+            f'<td><code>{escape(r.case_id)}</code></td>'
+            f'<td><span class="badge {badge_cls}" aria-label="{escape(r.decision)}">'
             f'{icon} <span class="badge-label">{r.decision}</span></span></td>'
             f"<td>{_mean_score(r):.2f}</td>"
             f"<td>{reasons_html}{models_html}</td>"
@@ -71,7 +72,7 @@ def to_html(results: list[GateResult], title: str = "Verdict AI Report") -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title}</title>
+  <title>{escape(title)}</title>
   <style>
     body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
          margin:2rem;color:#1a1a1a;background:#f8f9fa}}
@@ -91,7 +92,7 @@ def to_html(results: list[GateResult], title: str = "Verdict AI Report") -> str:
   </style>
 </head>
 <body>
-  <h1>{title}</h1>
+  <h1>{escape(title)}</h1>
   <table>
     <thead><tr>
       <th>Case ID</th><th>Decision</th><th>Mean Score</th><th>Reasons</th>

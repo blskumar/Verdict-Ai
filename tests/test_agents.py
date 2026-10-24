@@ -16,7 +16,7 @@ from verdict_ai.agents.generator import run_generator
 from verdict_ai.agents.reviewer import run_reviewer
 from verdict_ai.llm import MockModel
 from verdict_ai.models import CheckResult, CaseType, Requirement, TestCase
-from verdict_ai.orchestrator import Orchestrator, OrchestratorConfig, RunResult
+from verdict_ai.orchestrator import Orchestrator, OrchestratorConfig
 
 
 # ---------------------------------------------------------------------------
@@ -362,3 +362,40 @@ def test_orchestrator_resume_file(tmp_path):
     assert resume.exists()
     saved = json.loads(resume.read_text())
     assert "reviewer" in saved
+
+
+def test_reviewer_shuffled_order_matches_by_case_id():
+    cases = [_case("TC-01"), _case("TC-02")]
+    reqs = [_req()]
+    # Model returns TC-02 first, then TC-01
+    shuffled_response = json.dumps([
+        {"case_id": "TC-02", "passed": False, "score": 0.3, "reason": "Defective scenario."},
+        {"case_id": "TC-01", "passed": True, "score": 0.95, "reason": "Good scenario."},
+    ])
+    router = _mock_router(shuffled_response, "reviewer")
+    results = run_reviewer(router, cases, reqs)
+    res_map = {r.case_id: r for r in results}
+    assert res_map["TC-01"].score == pytest.approx(0.95)
+    assert res_map["TC-01"].passed is True
+    assert res_map["TC-02"].score == pytest.approx(0.3)
+    assert res_map["TC-02"].passed is False
+
+
+def test_checker_missing_case_falls_back_neutral():
+    cases = [_case("TC-01"), _case("TC-02")]
+    reqs = [_req()]
+    # Model only returned 1 result for 2 cases
+    incomplete_response = json.dumps([
+        {"case_id": "TC-01", "passed": True, "score": 0.9, "reason": "Good."},
+    ])
+    router = _mock_router(incomplete_response, "checker")
+    results = run_checker(router, cases, reqs)
+    assert len(results) == 2
+    res_map = {r.case_id: r for r in results}
+    assert res_map["TC-01"].passed is True
+    assert res_map["TC-02"].score == pytest.approx(0.5)
+
+
+def test_case_type_security():
+    assert CaseType.security.value == "Security"
+    assert CaseType("Security") == CaseType.security

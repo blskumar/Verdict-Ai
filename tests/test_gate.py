@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
 
 from verdict_ai.gate import GateEngine
 from verdict_ai.models import CheckResult, GateResult
@@ -120,6 +118,17 @@ def test_threshold_override():
     # Use 0.75 to be safely above revise_max.
     result = eng.decide("TC-09", [], [_check("TC-09", False, 0.75)])
     assert result.decision == "approve"
+
+
+def test_domain_thresholds_override():
+    eng = GateEngine(domain_thresholds={"revise_below": 0.60, "human_review_band": [0.60, 0.80]})
+    assert eng.revise_max == 0.60
+    assert eng.human_review_min == 0.60
+    assert eng.approve_threshold == 0.80
+    res = eng.decide("TC-DT", [], [_check("TC-DT", False, 0.65)])
+    assert res.decision == "human_review"
+    res_app = eng.decide("TC-DT2", [], [_check("TC-DT2", False, 0.82)])
+    assert res_app.decision == "approve"
 
 
 # ---------------------------------------------------------------------------

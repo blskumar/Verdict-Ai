@@ -20,7 +20,7 @@ from verdict_ai import domains as dom
 from verdict_ai.gate import GateEngine
 from verdict_ai.llm import ModelRouter
 from verdict_ai.loader import load_cases, load_requirements
-from verdict_ai.models import CheckResult, Decision, GateResult, Requirement, TestCase
+from verdict_ai.models import CheckResult, GateResult
 from verdict_ai.orchestrator import Orchestrator, OrchestratorConfig
 from verdict_ai.rules import Finding, run_rules
 
@@ -219,6 +219,7 @@ def run_evaluation(
             router = ModelRouter()
 
         domain_ctx = ""
+        pack = None
         try:
             pack = dom.load_pack(domain)
             domain_ctx = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
@@ -236,8 +237,31 @@ def run_evaluation(
             if c.model_name:
                 models_used_set.add(c.model_name)
 
+        if run_res.exhausted_case_ids:
+            for cid in run_res.exhausted_case_ids:
+                findings.append(Finding(
+                    case_id=cid,
+                    code="ALL_MODELS_EXHAUSTED",
+                    decision="human_review",
+                    reason="No model could judge this case.",
+                    requirement_id=None,
+                ))
+
+        cases_with_model_checks = {c.case_id for c in checks if c.source == "model"}
+        for c in all_cases:
+            if c.id not in cases_with_model_checks:
+                if not any(f.case_id == c.id and f.decision in ("reject", "revise", "human_review") for f in findings):
+                    findings.append(Finding(
+                        case_id=c.id,
+                        code="UNJUDGED",
+                        decision="human_review",
+                        reason="No model could judge this case.",
+                        requirement_id=c.requirement_id or None,
+                    ))
+
     # 3. Gate engine
-    engine = GateEngine(threshold_override=approve_threshold)
+    domain_thresh = pack.thresholds if pack else None
+    engine = GateEngine(threshold_override=approve_threshold, domain_thresholds=domain_thresh)
     case_ids = [c.id for c in all_cases]
     gate_results = engine.run(case_ids, findings, checks)
     result_map: dict[str, GateResult] = {r.case_id: r for r in gate_results}

@@ -107,7 +107,14 @@ def run_arbiter(
         ]
         raw, model = router.chat(ROLE, messages)
         parsed = _parse(raw, batch)
-        for case, item in zip(batch, parsed):
+        parsed_by_id = {item["case_id"]: item for item in parsed if isinstance(item, dict) and "case_id" in item}
+        for idx, case in enumerate(batch):
+            if case.id in parsed_by_id:
+                item = parsed_by_id[case.id]
+            elif idx < len(parsed) and isinstance(parsed[idx], dict):
+                item = parsed[idx]
+            else:
+                item = {"passed": False, "score": 0.72, "reason": "Unresolved — flagged for human review."}
             results.append(
                 CheckResult(
                     check_name="arbiter",

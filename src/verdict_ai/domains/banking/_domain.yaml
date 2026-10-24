@@ -1,0 +1,25 @@
+name: Banking & Financial Services
+description: Retail banking, commercial lending, deposit accounts, transactions, and regulatory compliance.
+context: >
+  Banking software handles customer onboarding, account lifecycle, deposit operations, funds transfers,
+  lending origination, interest calculation, fee assessment, and financial compliance (KYC, AML, OFAC).
+  Transactions must enforce atomicity, strict balance validation, overdraft rules, and complete audit logging.
+glossary:
+  kyc: Know Your Customer identity verification before account opening.
+  aml: Anti-Money Laundering monitoring of suspicious transaction thresholds.
+  overdraft: Account balance falling below zero during debit transactions.
+  apr: Annual Percentage Rate applied to borrowing and credit lines.
+  ach: Automated Clearing House electronic funds transfer network.
+  audit trail: Immutable log of actor, timestamp, balance delta, and reason.
+risk_tags: [money, regulatory, security, audit, credit_risk, ledger_integrity]
+boundary_hints:
+  - Check transaction limits, minimum balance, and overdraft thresholds.
+  - Verify negative balance handling, daily fee assessment caps, and overdraft opt-in flags.
+  - Check account age requirements, credit score tiers, and debt-to-income limits.
+vague_terms: [appropriate, reasonable, sufficient, timely, properly, secure, as per policy, valid]
+ambiguous_phrases: ["subject to approval", "based on banking policy", "within normal timeframes", "standard fees apply"]
+thresholds:
+  revise_below: 0.70
+  human_review_band: [0.70, 0.85]
+  similarity: 0.85
+id_prefixes: [BANK]

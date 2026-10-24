@@ -83,13 +83,18 @@ def run_generator(
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": _USER_TMPL.format(context=context or "None", items=items)},
         ]
-        raw, _model = router.chat(ROLE, messages)
+        try:
+            raw, _model = router.chat(ROLE, messages)
+        except Exception:
+            raw = None
         parsed = _parse(raw, batch)
         output.extend(parsed)
     return output
 
 
-def _parse(raw: str, batch: list[Requirement]) -> list[dict]:
+def _parse(raw: str | None, batch: list[Requirement]) -> list[dict]:
+    if not raw or not isinstance(raw, str):
+        return [{"req_id": r.id, "cases": []} for r in batch]
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[-1]

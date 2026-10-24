@@ -1,6 +1,6 @@
 # Verdict AI — Test Case Gatekeeper
 
-[![Tests](https://img.shields.io/badge/pytest-83%20passed-brightgreen.svg)](file:///C:/Verdict-Ai/tests)
+[![Tests](https://img.shields.io/badge/pytest-93%20passed-brightgreen.svg)](tests)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v3-38B2AC.svg)](https://tailwindcss.com/)
@@ -94,7 +94,7 @@ Reason Compliance:     100.0%         — Target: 100%   [PASS]
 ### 4. Run Pytest Suite
 ```bash
 pytest -q
-# 83 passed, 0 failed
+# 93 passed, 0 failed
 ```
 
 ---
@@ -115,7 +115,6 @@ pytest -q
 
 For full configuration, threshold tuning, multi-agent prompts, and API reference, see:
 - [User Guide](docs/user-guide.md)
-- [Project Status](C:/Users/shara/.gemini/antigravity-ide/brain/1df45cb8-011d-4d88-a77d-b48e453d5df7/project_status.md)
 - Interactive Swagger API: `http://127.0.0.1:8000/docs`
 
 ---

@@ -154,3 +154,13 @@ def test_mock_model_no_network():
     assert text == '{"score": 0.9}'
     assert model == "mock-model"
     assert len(mock.calls) == 1
+
+
+def test_unauthorized_401_raises_immediately(tmp_path):
+    router = _router(tmp_path)
+    err_401 = MagicMock()
+    err_401.status_code = 401
+    err_401.text = "Unauthorized"
+    with patch("httpx.Client.post", return_value=err_401):
+        with pytest.raises(AllModelsExhausted, match="OPENROUTER_API_KEY"):
+            router.chat("analyst", [{"role": "user", "content": "hi"}])

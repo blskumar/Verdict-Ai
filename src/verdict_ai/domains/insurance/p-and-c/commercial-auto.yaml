@@ -1,0 +1,17 @@
+name: Commercial Auto
+id_prefixes: [CA]
+context: >
+  Commercial auto covers vehicles used for business. Fleets are rated vehicle by vehicle with
+  business, vehicle, territory and mileage factors. Fleet size above a threshold goes to
+  referral, and some business classes are prohibited outright. Adding a vehicle mid-term creates
+  an endorsement with a prorated premium.
+glossary:
+  VIN: Vehicle identification number, 17 characters.
+  fleet credit: A discount applied to eligible fleet premium, only once.
+  hired and non-owned auto: Liability cover for vehicles the business hires or does not own.
+  idempotency key: A token that makes a repeated request create nothing new.
+risk_tags: [fleet, referral_vs_decline, proration, duplicate_credit]
+boundary_hints:
+  - VIN of 16 and 18 characters.
+  - Fleet size exactly at, and one above, the auto-quote threshold.
+  - Vehicle added on the first and last day of the term.

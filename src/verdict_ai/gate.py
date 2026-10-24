@@ -23,8 +23,14 @@ class GateEngine:
         self,
         config_path: str | Path = "gate.yaml",
         threshold_override: float | None = None,
+        domain_thresholds: dict | None = None,
     ) -> None:
         config_file = Path(config_path)
+        if not config_file.exists():
+            pkg_fallback = Path(__file__).resolve().parent / "gate.yaml"
+            if pkg_fallback.exists():
+                config_file = pkg_fallback
+
         if config_file.exists():
             with open(config_file, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
@@ -32,12 +38,25 @@ class GateEngine:
             cfg = {}
 
         thresh = cfg.get("thresholds", {})
+        if domain_thresholds:
+            if "revise_below" in domain_thresholds:
+                thresh["revise_max"] = domain_thresholds["revise_below"]
+                thresh["human_review_min"] = domain_thresholds["revise_below"]
+            if "human_review_band" in domain_thresholds:
+                band = domain_thresholds["human_review_band"]
+                if isinstance(band, (list, tuple)) and len(band) >= 2:
+                    thresh["human_review_min"] = band[0]
+                    thresh["approve"] = band[1]
+            for k in ("approve", "human_review_min", "revise_max"):
+                if k in domain_thresholds:
+                    thresh[k] = domain_thresholds[k]
+
         self.approve_threshold: float = (
             threshold_override if threshold_override is not None
             else thresh.get("approve", 0.85)
         )
         self.human_review_min: float = thresh.get("human_review_min", 0.70)
-        self.revise_max: float = thresh.get("revise_max", 0.70)
+        self.revise_max: float = thresh.get("revise_max", self.human_review_min)
 
     # ------------------------------------------------------------------
     # Core logic

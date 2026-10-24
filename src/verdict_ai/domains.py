@@ -41,6 +41,9 @@ def default_root() -> Path:
     for base in (Path.cwd(), *here.parents):
         if (base / "domains").is_dir():
             return base / "domains"
+    pkg_domains = here.parent / "domains"
+    if pkg_domains.is_dir():
+        return pkg_domains
     raise DomainError("No 'domains' folder found. Run from the project folder or pass --domains-dir.")
 
 

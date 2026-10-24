@@ -47,6 +47,11 @@ class ModelRouter:
         self.api_key = os.getenv("OPENROUTER_API_KEY", "")
 
         config_file = Path(config_path)
+        if not config_file.exists():
+            pkg_fallback = Path(__file__).resolve().parent / "models.yaml"
+            if pkg_fallback.exists():
+                config_file = pkg_fallback
+
         if config_file.exists():
             with open(config_file, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
@@ -178,6 +183,11 @@ class ModelRouter:
         except httpx.RequestError as e:
             raise _RetryableError(f"Request error: {e}") from e
 
+        if resp.status_code == 401:
+            raise AllModelsExhausted(
+                f"OpenRouter authentication failed (HTTP 401): {resp.text[:200]}. "
+                "Check that OPENROUTER_API_KEY is set and valid."
+            )
         if resp.status_code != 200:
             raise _RetryableError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 

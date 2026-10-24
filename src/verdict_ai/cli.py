@@ -86,7 +86,7 @@ def web(
         typer.secho(f"Starting Verdict AI WebUI at http://{host}:{port}", fg="green")
         uvicorn.run("verdict_ai.web.app:app", host=host, port=port, reload=reload)
     except ImportError:
-        typer.secho("uvicorn or fastapi not installed. Run: pip install 'verdictai-gate[web]'", fg="red", err=True)
+        typer.secho("uvicorn or fastapi not installed. Run: pip install verdictai-gate", fg="red", err=True)
         raise typer.Exit(1)
 
 
@@ -117,6 +117,8 @@ def evaluate(
         typer.secho(f"Results saved to:\n  {json_p}\n  {md_p}", fg="green")
         if not report.targets_met:
             raise typer.Exit(1)
+    except typer.Exit:
+        raise
     except Exception as exc:
         typer.secho(f"Evaluation failed: {exc}", fg="red", err=True)
         raise typer.Exit(1)

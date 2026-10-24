@@ -6,15 +6,13 @@ Verdict AI gatekeeper pipeline, and reports all detected defects.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from verdict_ai import domains as dom
 from verdict_ai.evaluate import _build_evaluation_mock_router
 from verdict_ai.gate import GateEngine
-from verdict_ai.models import CaseType, CheckResult, GateResult, Requirement, TestCase
+from verdict_ai.models import CaseType, Requirement, TestCase
 from verdict_ai.orchestrator import Orchestrator, OrchestratorConfig
-from verdict_ai.report import to_markdown, to_html, to_json, to_csv
+from verdict_ai.report import to_markdown, to_json
 from verdict_ai.rules import run_rules
 
 
@@ -198,7 +196,7 @@ def run_e2e_check() -> None:
 
     print("-" * 70)
     print(f"Results Summary: {approved_count} Approved, {defect_count} Caught with Defects.")
-    print(f"Target accuracy: 3/3 good cases approved, 8/8 defective cases caught (100% precision).")
+    print("Target accuracy: 3/3 good cases approved, 8/8 defective cases caught (100% precision).")
 
     # Save reports
     out_dir = Path("runs/e2e")

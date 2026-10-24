@@ -68,6 +68,6 @@ def test_cli_domains_list_and_load():
 def test_domain_path_cannot_leave_the_domains_folder():
     import pytest
     from verdict_ai.domains import DomainError, load_pack
-    for bad in ("../domains/insurance", "insurance/../insurance", "insurance\life"):
+    for bad in ("../domains/insurance", "insurance/../insurance", "insurance\\life"):
         with pytest.raises(DomainError):
             load_pack(bad)

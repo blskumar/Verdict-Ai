@@ -31,7 +31,7 @@ verdict-ai = "verdict_ai.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-verdict_ai = ["py.typed"]
+verdict_ai = ["py.typed", "web/static/*", "*.yaml", "domains/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

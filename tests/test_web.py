@@ -450,5 +450,82 @@ def test_recommended_scenarios_and_case_generation_counts_match(client: TestClie
             assert [c["id"] for c in gen_cases] == expected_ids
 
 
+def test_evaluate_live_mode_fails_safe_to_human_review(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    reqs = [{"id": "REQ-01", "title": "Req", "text": "Spec text."}]
+    cases = [{
+        "id": "TC-01",
+        "requirement_id": "REQ-01",
+        "type": "Positive",
+        "scenario": "Some scenario.",
+        "expected": "Definitive outcome.",
+    }]
+    resp = client.post(
+        "/api/evaluate",
+        json={
+            "requirements": reqs,
+            "cases": cases,
+            "agent_mode": "live",
+            "use_rules": False,
+            "use_agents": True,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["gate_results"][0]["decision"] == "human_review"
+    assert "No model could judge" in data["gate_results"][0]["reasons"][0] or "Live model evaluation failed" in data["gate_results"][0]["reasons"][0]
+
+
+def test_evaluate_mock_router_pairs_scores_per_batch(client: TestClient) -> None:
+    reqs = [{"id": "REQ-01", "title": "Req", "text": "Spec text."}]
+    # 5 good cases followed by 5 vague cases
+    cases = []
+    for i in range(1, 6):
+        cases.append({
+            "id": f"TC-{i:02d}",
+            "requirement_id": "REQ-01",
+            "type": "Positive",
+            "scenario": f"Scenario {i}",
+            "expected": "Exact specific outcome.",
+        })
+    for i in range(6, 11):
+        cases.append({
+            "id": f"TC-{i:02d}",
+            "requirement_id": "REQ-01",
+            "type": "Positive",
+            "scenario": f"Scenario {i}",
+            "expected": "System works correctly and is fine.",
+        })
+
+    resp = client.post(
+        "/api/evaluate",
+        json={
+            "requirements": reqs,
+            "cases": cases,
+            "agent_mode": "mock",
+            "use_rules": False,  # Agent-only evaluation to test mock router alignment
+            "use_agents": True,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    res_map = {r["case_id"]: r for r in data["gate_results"]}
+    # Cases 1-5 should be approved
+    for i in range(1, 6):
+        assert res_map[f"TC-{i:02d}"]["decision"] == "approve"
+    # Cases 6-10 should NOT be approved because their expected outcome is vague
+    for i in range(6, 11):
+        assert res_map[f"TC-{i:02d}"]["decision"] != "approve"
+
+
+def test_api_upload_file_size_limit(client: TestClient) -> None:
+    large_payload = b"A" * (26 * 1024 * 1024)
+    resp = client.post(
+        "/api/upload",
+        files={"file": ("large.json", BytesIO(large_payload), "application/json")},
+    )
+    assert resp.status_code == 413
+
+
 
 

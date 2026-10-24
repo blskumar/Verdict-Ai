@@ -12,6 +12,7 @@ class CaseType(str, Enum):
     negative = "Negative"
     boundary = "Boundary"
     calculation = "Calculation"
+    security = "Security"
 
 
 class Requirement(BaseModel):

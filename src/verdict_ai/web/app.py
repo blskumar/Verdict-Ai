@@ -7,15 +7,14 @@ from __future__ import annotations
 import csv
 import io
 import json
-import os
 import re
 import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -23,7 +22,7 @@ from verdict_ai import domains as dom
 from verdict_ai.agents.generator import run_generator
 from verdict_ai.gate import GateEngine
 from verdict_ai.llm import ModelRouter
-from verdict_ai.loader import LoadError, load_cases, load_requirements
+from verdict_ai.loader import load_cases, load_requirements
 from verdict_ai.models import CaseType, CheckResult, Decision, GateResult, Requirement, TestCase
 from verdict_ai.orchestrator import Orchestrator, OrchestratorConfig
 from verdict_ai.report import to_csv, to_html, to_json, to_markdown
@@ -51,7 +50,7 @@ class EvaluateRequest(BaseModel):
     requirements: list[dict[str, Any]] = Field(default_factory=list)
     cases: list[dict[str, Any]] = Field(default_factory=list)
     domain: str | None = None
-    approve_threshold: float = 0.85
+    approve_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
     use_rules: bool = True
     use_agents: bool = True
     agent_mode: Literal["mock", "live"] = "mock"
@@ -185,6 +184,7 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
         def chat(self, role: str, messages: list[dict], *, context: str = ""):  # noqa: ARG002
             user_msg = messages[1]["content"] if len(messages) > 1 else ""
             batch_req_ids = set(re.findall(r"req_id:\s*([^\s\n]+)", user_msg))
+            batch_case_ids = set(re.findall(r"case_id:\s*([^\s\n]+)", user_msg))
 
             if role == "analyst":
                 target_reqs = [r for r in reqs if r.id in batch_req_ids] if batch_req_ids else reqs
@@ -194,9 +194,11 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
                 ]
                 return json.dumps(analyst_data), "mock-analyst"
             if role == "reviewer":
-                return json.dumps(reviewer_payload), "mock-reviewer"
+                target_cases = [c for c in reviewer_payload if c["case_id"] in batch_case_ids] if batch_case_ids else reviewer_payload
+                return json.dumps(target_cases), "mock-reviewer"
             if role == "checker":
-                return json.dumps(checker_payload), "mock-checker"
+                target_cases = [c for c in checker_payload if c["case_id"] in batch_case_ids] if batch_case_ids else checker_payload
+                return json.dumps(target_cases), "mock-checker"
             if role == "arbiter":
                 return json.dumps([]), "mock-arbiter"
             if role == "generator":
@@ -219,6 +221,20 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
             return "[]", "mock-model"
 
     return WebMockRouter()
+
+
+def _dict_to_requirement(r: dict[str, Any], default_idx: int = 1) -> Requirement:
+    risk_val = r.get("risk", "medium")
+    risk = risk_val if risk_val in ("low", "medium", "high") else "medium"
+    req_id = str(r.get("id") or f"REQ-{default_idx:03d}")
+    return Requirement(
+        id=req_id,
+        title=str(r.get("title") or req_id),
+        text=str(r.get("text", "")),
+        acceptance_criteria=str(r.get("acceptance_criteria", "")),
+        domain=r.get("domain"),
+        risk=risk,
+    )
 
 
 def _build_decision_analysis(
@@ -260,7 +276,7 @@ def _build_decision_analysis(
             why_revised="Revision is insufficient because the underlying assertion is fundamentally flawed or untraceable.",
             why_rejected=(
                 f"Critical defect identified: {reasons_text}. "
-                f"Test case asserts incorrect calculation logic or references non-existent requirements in {req_label}."
+                f"Underlying test assertion or requirement reference cannot be verified for {req_label}."
             ),
             human_review_actions="Audit requirement version history to check if requirement was deprecated, replaced, or misinterpreted.",
             human_discretion_grounds="Final business determination to deprecate this test case or issue a formal requirement change request.",
@@ -291,8 +307,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -426,6 +442,8 @@ def create_app() -> FastAPI:
                 content = await f.read()
                 if not content:
                     return
+                if len(content) > 25 * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail=f"File '{safe_name}' exceeds maximum allowed upload size (25MB).")
                 tmp_path = Path(tmp_dir) / safe_name
                 tmp_path.write_bytes(content)
 
@@ -506,16 +524,7 @@ def create_app() -> FastAPI:
         if req.raw_text and req.raw_text.strip():
             req_models = parse_raw_requirements_text(req.raw_text)
         elif req.requirements:
-            for r in req.requirements:
-                risk_val = r.get("risk", "medium")
-                risk = risk_val if risk_val in ("low", "medium", "high") else "medium"
-                req_models.append(Requirement(
-                    id=str(r.get("id", f"REQ-{len(req_models)+1:03d}")),
-                    title=str(r.get("title", r.get("id", "Requirement"))),
-                    text=str(r.get("text", "")),
-                    acceptance_criteria=str(r.get("acceptance_criteria", "")),
-                    risk=risk,
-                ))
+            req_models = [_dict_to_requirement(r, idx) for idx, r in enumerate(req.requirements, start=1)]
 
         if not req_models:
             raise HTTPException(status_code=400, detail="No requirements provided for analysis.")
@@ -558,17 +567,7 @@ def create_app() -> FastAPI:
     @app.post("/api/requirements/generate-cases")
     def generate_cases_endpoint(req: GenerateCasesRequest) -> dict[str, Any]:
         """Automatically synthesize candidate test cases from requirements using AI generator."""
-        req_models: list[Requirement] = []
-        for r in req.requirements:
-            risk_val = r.get("risk", "medium")
-            risk = risk_val if risk_val in ("low", "medium", "high") else "medium"
-            req_models.append(Requirement(
-                id=str(r.get("id", f"REQ-{len(req_models)+1:03d}")),
-                title=str(r.get("title", r.get("id", "Requirement"))),
-                text=str(r.get("text", "")),
-                acceptance_criteria=str(r.get("acceptance_criteria", "")),
-                risk=risk,
-            ))
+        req_models = [_dict_to_requirement(r, idx) for idx, r in enumerate(req.requirements, start=1)]
 
         if not req_models:
             raise HTTPException(status_code=400, detail="No requirements provided for test case generation.")
@@ -586,7 +585,11 @@ def create_app() -> FastAPI:
         else:
             router = ModelRouter()
 
-        raw_generated = run_generator(router, req_models, context=domain_context)
+        try:
+            raw_generated = run_generator(router, req_models, context=domain_context)
+        except Exception:
+            fallback_router = _build_mock_router_for_evaluation([], req_models)
+            raw_generated = run_generator(fallback_router, req_models, context=domain_context)
 
         # Build map of generated cases by requirement id
         raw_by_req: dict[str, list[dict[str, Any]]] = {}
@@ -640,20 +643,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="No test cases provided for evaluation.")
 
         # Convert dicts to Pydantic models
-        req_models: list[Requirement] = []
-        for r in req.requirements:
-            try:
-                risk_val = r.get("risk", "medium")
-                risk = risk_val if risk_val in ("low", "medium", "high") else "medium"
-                req_models.append(Requirement(
-                    id=r["id"],
-                    title=r.get("title", r["id"]),
-                    text=r.get("text", ""),
-                    acceptance_criteria=r.get("acceptance_criteria", ""),
-                    risk=risk,
-                ))
-            except Exception as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid requirement {r.get('id')}: {exc}")
+        try:
+            req_models: list[Requirement] = [
+                _dict_to_requirement(r, idx) for idx, r in enumerate(req.requirements, start=1)
+            ]
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid requirement: {exc}")
 
         case_models: list[TestCase] = []
         for c in req.cases:
@@ -679,6 +674,7 @@ def create_app() -> FastAPI:
 
         # Domain context
         domain_context = ""
+        pack = None
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
@@ -694,6 +690,7 @@ def create_app() -> FastAPI:
         # 2. Agent / LLM Checks with safe failover
         checks: list[CheckResult] = []
         if req.use_agents:
+            run_res = None
             if req.agent_mode == "mock":
                 router = _build_mock_router_for_evaluation(case_models, req_models)
                 orchestrator = Orchestrator(router, OrchestratorConfig(run_analyst=True, run_arbiter=True))
@@ -706,21 +703,42 @@ def create_app() -> FastAPI:
                     run_res = orchestrator.run(req_models, case_models, context=domain_context)
                     checks = run_res.all_checks()
                 except Exception as exc:
-                    # Graceful failover to local engine when live models are rate-limited or exhausted
-                    mock_router = _build_mock_router_for_evaluation(case_models, req_models)
-                    orchestrator = Orchestrator(mock_router, OrchestratorConfig(run_analyst=True, run_arbiter=True))
-                    run_res = orchestrator.run(req_models, case_models, context=domain_context)
-                    checks = run_res.all_checks()
+                    run_res = None
+                    for c in case_models:
+                        findings.append(Finding(
+                            case_id=c.id,
+                            code="LIVE_LLM_FAILURE",
+                            decision="human_review",
+                            reason=f"Live model evaluation failed: {exc}",
+                            requirement_id=c.requirement_id or None,
+                        ))
+
+            if run_res and run_res.exhausted_case_ids:
+                for cid in run_res.exhausted_case_ids:
                     findings.append(Finding(
-                        case_id=None,
-                        code="LLM_FAILOVER",
+                        case_id=cid,
+                        code="ALL_MODELS_EXHAUSTED",
                         decision="human_review",
-                        reason=f"Live LLM router failover triggered ({exc}). Executed via local consensus engine.",
+                        reason="No model could judge this case.",
                         requirement_id=None,
                     ))
 
+            # Cases with zero model checks when agents are requested get human review
+            cases_with_model_checks = {c.case_id for c in checks if c.source == "model"}
+            for c in case_models:
+                if c.id not in cases_with_model_checks:
+                    if not any(f.case_id == c.id and f.decision in ("reject", "revise", "human_review") for f in findings):
+                        findings.append(Finding(
+                            case_id=c.id,
+                            code="UNJUDGED",
+                            decision="human_review",
+                            reason="No model could judge this case.",
+                            requirement_id=c.requirement_id or None,
+                        ))
+
         # 3. Gate Engine
-        engine = GateEngine(threshold_override=req.approve_threshold)
+        domain_thresh = pack.thresholds if pack else None
+        engine = GateEngine(threshold_override=req.approve_threshold, domain_thresholds=domain_thresh)
         case_ids = [c.id for c in case_models]
         gate_results = engine.run(case_ids, findings, checks)
 
@@ -875,17 +893,7 @@ def create_app() -> FastAPI:
     @app.post("/api/requirements/export/{fmt}")
     def export_requirements_review(fmt: Literal["json", "csv", "md", "html"], req: ExportRequirementsReviewRequest) -> Response:
         """Export analyzed requirements with quality review, ambiguities, and remediation guides."""
-        req_models: list[Requirement] = []
-        for r in req.requirements:
-            risk_val = r.get("risk", "medium")
-            risk = risk_val if risk_val in ("low", "medium", "high") else "medium"
-            req_models.append(Requirement(
-                id=str(r.get("id", f"REQ-{len(req_models)+1:03d}")),
-                title=str(r.get("title", r.get("id", "Requirement"))),
-                text=str(r.get("text", "")),
-                acceptance_criteria=str(r.get("acceptance_criteria", "")),
-                risk=risk,
-            ))
+        req_models = [_dict_to_requirement(r, idx) for idx, r in enumerate(req.requirements, start=1)]
 
         if not req_models:
             raise HTTPException(status_code=400, detail="No requirements provided for review export.")

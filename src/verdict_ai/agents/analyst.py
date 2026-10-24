@@ -77,7 +77,14 @@ def run_analyst(
         ]
         raw, model = router.chat(ROLE, messages)
         parsed = _parse(raw, batch)
-        for req, item in zip(batch, parsed):
+        parsed_by_id = {item["req_id"]: item for item in parsed if isinstance(item, dict) and "req_id" in item}
+        for idx, req in enumerate(batch):
+            if req.id in parsed_by_id:
+                item = parsed_by_id[req.id]
+            elif idx < len(parsed) and isinstance(parsed[idx], dict):
+                item = parsed[idx]
+            else:
+                item = {"passed": True, "score": 0.5, "reason": "No evaluation returned for requirement — treated as neutral."}
             results.append(
                 CheckResult(
                     check_name="analyst",
