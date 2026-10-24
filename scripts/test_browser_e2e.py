@@ -22,7 +22,7 @@ def wait_for_server(timeout=15):
     start = time.time()
     while time.time() - start < timeout:
         try:
-            req = urllib.request.Request(f"{BASE_URL}/health")
+            req = urllib.request.Request(f"{BASE_URL}/api/domains")
             with urllib.request.urlopen(req, timeout=1) as res:
                 if res.status == 200:
                     print(f"[OK] Verdict AI server responsive at {BASE_URL}")
@@ -48,20 +48,14 @@ def run_e2e_browser_test():
                     SERVER_HOST,
                     "--port",
                     str(SERVER_PORT),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                ]
             )
             if not wait_for_server(timeout=20):
                 print("[ERROR] Server failed to start within 20s.")
-                if server_process:
-                    out, err = server_process.communicate()
-                    print(err.decode())
                 sys.exit(1)
 
         print("[INFO] Launching Playwright browser...")
         with sync_playwright() as p:
-            # Try msedge first, fallback to chrome or bundled chromium
             browser = None
             for channel in ["msedge", "chrome", None]:
                 try:
