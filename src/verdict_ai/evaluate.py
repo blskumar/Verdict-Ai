@@ -207,7 +207,11 @@ def run_evaluation(
     # 1. Rule checks
     findings: list[Finding] = []
     if use_rules:
-        findings = run_rules(reqs, all_cases)
+        try:
+            rule_pack = dom.load_pack(domain)
+        except Exception:
+            rule_pack = None  # rules still run; only the pack's own citation markers are missing
+        findings = run_rules(reqs, all_cases, pack=rule_pack)
 
     # 2. Agent checks
     checks: list[CheckResult] = []
@@ -223,7 +227,7 @@ def run_evaluation(
         pack = None
         try:
             pack = dom.load_pack(domain)
-            domain_ctx = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+            domain_ctx = dom.context_text(pack)
         except Exception:
             pass
 

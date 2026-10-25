@@ -6,12 +6,12 @@ judgements conflict. Returns one CheckResult per disputed case.
 """
 from __future__ import annotations
 
-import json
-
+from verdict_ai.agents._common import build_check, index_by_id, parse_items
 from verdict_ai.llm import ModelRouter
 from verdict_ai.models import CheckResult, Requirement, TestCase
 
 ROLE = "arbiter"
+UNRESOLVED = "Unresolved — flagged for human review."
 
 # Disagreement thresholds
 SCORE_GAP = 0.3          # abs(reviewer_score - checker_score) >= this triggers arbiter
@@ -106,38 +106,10 @@ def run_arbiter(
             {"role": "user", "content": _USER_TMPL.format(context=context or "None", items=items)},
         ]
         raw, model = router.chat(ROLE, messages)
-        parsed = _parse(raw, batch)
-        parsed_by_id = {}
-        for item in parsed:
-            if isinstance(item, dict) and "case_id" in item and isinstance(item["case_id"], (str, int)):
-                parsed_by_id[str(item["case_id"])] = item
-
+        replies, error = parse_items(raw)
+        by_id = index_by_id(replies, "case_id")
         for case in batch:
-            if case.id in parsed_by_id:
-                item = parsed_by_id[case.id]
-                try:
-                    score_val = float(item.get("score", 0.72))
-                    score_val = max(0.0, min(1.0, score_val))
-                except (ValueError, TypeError):
-                    score_val = 0.72
-                passed_val = bool(item.get("passed", False))
-                reason_val = str(item.get("reason", "Unresolved — flagged for human review."))
-            else:
-                passed_val = False
-                score_val = 0.72
-                reason_val = "Unresolved — flagged for human review."
-
-            results.append(
-                CheckResult(
-                    check_name="arbiter",
-                    case_id=case.id,
-                    passed=passed_val,
-                    score=score_val,
-                    reason=reason_val,
-                    source="model",
-                    model_name=model,
-                )
-            )
+            results.append(build_check("arbiter", case.id, by_id.get(case.id), model, error, unjudged_reason=UNRESOLVED))
     return results
 
 
@@ -146,27 +118,3 @@ def _stub(req_id: str) -> "object":
         text = f"Requirement {req_id} not found."
     return _Stub()
 
-
-def _parse(raw: str, batch: list[TestCase]) -> list[dict]:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-    if text.endswith("```"):
-        text = text[: text.rfind("```")]
-    try:
-        data = json.loads(text.strip())
-        if isinstance(data, list):
-            return data
-        if isinstance(data, dict):
-            return [data]
-    except (json.JSONDecodeError, ValueError):
-        pass
-    return [
-        {
-            "case_id": c.id,
-            "passed": False,
-            "score": 0.72,
-            "reason": "Unresolved — flagged for human review.",
-        }
-        for c in batch
-    ]

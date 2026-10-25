@@ -639,6 +639,8 @@ def _cases_from_csv(path: Path, source: str) -> list[TestCase]:
                 mapped["scenario"] = val
             elif lk in ("expected", "expected_result", "expected_results", "outcome"):
                 mapped["expected"] = val
+            elif lk in ("source_ref", "source_reference", "reference", "cites", "rate_table", "expected_source"):
+                mapped["source_ref"] = val
             elif lk in ("type", "test_type", "case_type"):
                 try:
                     mapped["type"] = CaseType(val)

@@ -545,7 +545,7 @@ def create_app() -> FastAPI:
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
@@ -588,7 +588,7 @@ def create_app() -> FastAPI:
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
@@ -646,6 +646,7 @@ def create_app() -> FastAPI:
                     "type": case_type,
                     "scenario": c.get("scenario", f"Verify requirement {r.id} behavior."),
                     "expected": c.get("expected", "System behaves strictly according to specification."),
+                    "source_ref": str(c.get("source_ref") or ""),
                     "source": source,
                 })
 
@@ -689,6 +690,7 @@ def create_app() -> FastAPI:
                     type=case_type_enum,
                     scenario=c.get("scenario", ""),
                     expected=c.get("expected", ""),
+                    source_ref=str(c.get("source_ref") or ""),
                     source=src_val,
                 ))
             except Exception as exc:
@@ -700,14 +702,14 @@ def create_app() -> FastAPI:
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
         # 1. Rule Checks
         findings: list[Finding] = []
         if req.use_rules:
-            findings = run_rules(req_models, case_models)
+            findings = run_rules(req_models, case_models, pack=pack)
 
         # 2. Agent / LLM Checks with safe failover
         checks: list[CheckResult] = []
@@ -967,7 +969,7 @@ def create_app() -> FastAPI:
             if req.domain:
                 try:
                     pack = dom.load_pack(req.domain)
-                    domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                    domain_context = dom.context_text(pack)
                 except Exception:
                     pass
             if req.agent_mode == "mock":

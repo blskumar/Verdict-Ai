@@ -15,7 +15,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 MAX_DEPTH = 3
-LIST_FIELDS = ("risk_tags", "boundary_hints", "vague_terms", "ambiguous_phrases", "id_prefixes")
+LIST_FIELDS = ("risk_tags", "boundary_hints", "vague_terms", "ambiguous_phrases", "id_prefixes", "source_markers")
 
 
 class DomainError(ValueError):
@@ -33,6 +33,7 @@ class Pack(BaseModel):
     vague_terms: list[str] = Field(default_factory=list)
     ambiguous_phrases: list[str] = Field(default_factory=list)
     id_prefixes: list[str] = Field(default_factory=list)
+    source_markers: list[str] = Field(default_factory=list)  # extra phrases that count as a citation
     thresholds: dict = Field(default_factory=dict)
 
 
@@ -97,6 +98,20 @@ def merge(path: str, layers: list[dict]) -> Pack:
         out.setdefault("thresholds", {}).update(layer.get("thresholds") or {})
     out["context"] = "\n\n".join(contexts)
     return Pack(**out)
+
+
+def context_text(pack: Pack) -> str:
+    """The text the model roles receive about a domain: what it is, its terms, where the risk is."""
+    parts = [f"Domain: {pack.name}"]
+    if pack.context:
+        parts.append(pack.context)
+    if pack.glossary:
+        parts.append("Glossary:\n" + "\n".join(f"- {k}: {v}" for k, v in pack.glossary.items()))
+    if pack.risk_tags:
+        parts.append("Risk areas: " + ", ".join(pack.risk_tags))
+    if pack.boundary_hints:
+        parts.append("Boundaries worth testing:\n" + "\n".join(f"- {h}" for h in pack.boundary_hints))
+    return "\n\n".join(parts)
 
 
 def load_pack(path: str, root: Path | None = None) -> Pack:
