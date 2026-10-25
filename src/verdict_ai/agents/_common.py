@@ -43,6 +43,11 @@ def parse_items(raw: str | None) -> tuple[list[Any], str | None]:
     return [], "Model reply was not a JSON list."
 
 
+def reply_is_valid(raw: str | None) -> bool:
+    """True when the reply parses to JSON items. Used to decide whether a reply may be cached."""
+    return parse_items(raw)[1] is None
+
+
 def index_by_id(items: list[Any], key: str) -> dict[str, dict]:
     """Map id -> item. Skips non-dict items and ids that are not a plain string or int."""
     out: dict[str, dict] = {}

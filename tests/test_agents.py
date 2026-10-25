@@ -256,7 +256,7 @@ def _make_orchestrator(role_responses: dict[str, str]) -> Orchestrator:
             # return first available response
             return next(iter(self._responses.values()))
 
-        def chat(self, role, messages, *, context=""):
+        def chat(self, role, messages, *, context="", validate=None):
             return self._responses.get(role, "[]"), "mock-model"
 
     return Orchestrator(MultiMockRouter())

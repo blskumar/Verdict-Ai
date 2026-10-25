@@ -164,3 +164,16 @@ def test_unauthorized_401_raises_immediately(tmp_path):
     with patch("httpx.Client.post", return_value=err_401):
         with pytest.raises(AllModelsExhausted, match="OPENROUTER_API_KEY"):
             router.chat("analyst", [{"role": "user", "content": "hi"}])
+
+
+def test_invalid_reply_is_not_cached(tmp_path):
+    """A5: a reply that fails validation is never written to the disk cache or replayed from it."""
+    router = _router(tmp_path)
+    msgs = [{"role": "user", "content": "hi"}]
+    is_json = lambda t: t.startswith("{")  # noqa: E731
+    with patch("httpx.Client.post", side_effect=[_ok_resp("garbage"), _ok_resp('{"ok": 1}')]) as post_mock:
+        t1, _ = router.chat("analyst", msgs, validate=is_json)
+        t2, _ = router.chat("analyst", msgs, validate=is_json)
+        t3, _ = router.chat("analyst", msgs, validate=is_json)
+    assert (t1, t2, t3) == ("garbage", '{"ok": 1}', '{"ok": 1}')
+    assert post_mock.call_count == 2  # bad reply re-asked; good reply cached

@@ -5,7 +5,7 @@ and testability. Returns one CheckResult per case.
 """
 from __future__ import annotations
 
-from verdict_ai.agents._common import build_check, index_by_id, parse_items
+from verdict_ai.agents._common import build_check, index_by_id, parse_items, reply_is_valid
 from verdict_ai.llm import ModelRouter
 from verdict_ai.models import CheckResult, Requirement, TestCase
 
@@ -86,7 +86,7 @@ def run_reviewer(
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": _USER_TMPL.format(context=context or "None", items=items)},
         ]
-        raw, model = router.chat(ROLE, messages)
+        raw, model = router.chat(ROLE, messages, validate=reply_is_valid)
         replies, error = parse_items(raw)
         by_id = index_by_id(replies, "case_id")
         for case in batch:

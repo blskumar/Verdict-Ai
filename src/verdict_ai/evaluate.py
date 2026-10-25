@@ -80,7 +80,7 @@ def _build_evaluation_mock_router(
             self._request_count = 0
             self._bad_json_streak = {}
 
-        def chat(self, role: str, messages: list[dict], *, context: str = ""):  # noqa: ARG002
+        def chat(self, role: str, messages: list[dict], *, context: str = "", validate=None):  # noqa: ARG002
             prompt = messages[-1]["content"] if messages else ""
 
             if role == "analyst":

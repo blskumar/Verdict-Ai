@@ -182,7 +182,7 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
             self._request_count = 0
             self._bad_json_streak = {}
 
-        def chat(self, role: str, messages: list[dict], *, context: str = ""):  # noqa: ARG002
+        def chat(self, role: str, messages: list[dict], *, context: str = "", validate=None):  # noqa: ARG002
             user_msg = messages[1]["content"] if len(messages) > 1 else ""
             batch_req_ids = set(re.findall(r"req_id:\s*([^\s\n]+)", user_msg))
             batch_case_ids = set(re.findall(r"case_id:\s*([^\s\n]+)", user_msg))
@@ -849,10 +849,13 @@ def create_app() -> FastAPI:
         """Export evaluation results to downloadable file."""
         gate_models: list[GateResult] = []
         for idx, r in enumerate(req.results, start=1):
-            cid = str(r.get("case_id") or f"TC-EXPORT-{idx:03d}")
+            cid = r.get("case_id")
             dec = r.get("decision")
+            # Never invent an id or quietly turn an unknown decision into another one: reject the request.
+            if not isinstance(cid, str) or not cid.strip():
+                raise HTTPException(status_code=422, detail=f"Result {idx} has no case_id.")
             if dec not in ("approve", "revise", "reject", "human_review"):
-                dec = "human_review"
+                raise HTTPException(status_code=422, detail=f"Result {idx} ({cid}) has an unknown decision: {dec!r}.")
             gate_models.append(GateResult(
                 case_id=cid,
                 decision=dec,
@@ -904,14 +907,14 @@ def create_app() -> FastAPI:
         else:
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["id", "requirement_id", "type", "scenario", "expected", "source"])
+            w.writerow(["id", "requirement_id", "type", "scenario", "expected", "source", "source_ref"])
             first_group = True
             for rid, grp in groups.items():
                 if not first_group:
                     # Provide empty break row between requirement groups
                     w.writerow([])
                 clean_rid = _csv_clean(rid)
-                w.writerow([f"REQUIREMENT: {clean_rid} ({len(grp)} test cases)", "", "", "", "", ""])
+                w.writerow([f"REQUIREMENT: {clean_rid} ({len(grp)} test cases)", "", "", "", "", "", ""])
                 first_group = False
                 for c in grp:
                     w.writerow([
@@ -921,6 +924,7 @@ def create_app() -> FastAPI:
                         _csv_clean(c.get("scenario", "")),
                         _csv_clean(c.get("expected", "")),
                         _csv_clean(c.get("source", "uploaded")),
+                        _csv_clean(c.get("source_ref", "")),
                     ])
             body = buf.getvalue()
             content_type = "text/csv"

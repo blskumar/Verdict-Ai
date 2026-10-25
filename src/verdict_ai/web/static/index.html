@@ -954,6 +954,7 @@
             </div>
             <p class="text-xs text-foreground font-medium"><span class="text-muted-foreground">Scenario:</span> ${escapeHtml(tc.scenario || '')}</p>
             <p class="text-[11px] text-muted-foreground"><span class="font-semibold text-foreground/80">Expected:</span> ${escapeHtml(tc.expected || '')}</p>
+            ${tc.source_ref ? `<p class="text-[11px] text-muted-foreground"><span class="font-semibold text-foreground/80">Source:</span> ${escapeHtml(tc.source_ref)}</p>` : ''}
           </div>
         `).join('');
 
@@ -1491,15 +1492,15 @@
             if (!groups[rid]) groups[rid] = [];
             groups[rid].push(c);
           }
-          const headers = ['id', 'requirement_id', 'type', 'scenario', 'expected'];
+          const headers = ['id', 'requirement_id', 'type', 'scenario', 'expected', 'source_ref'];
           const lines = [headers.join(',')];
           let firstGrp = true;
           for (const [rid, grp] of Object.entries(groups)) {
             if (!firstGrp) {
-              lines.push(',,,,'); // Blank line break between groups
+              lines.push(',,,,,'); // Blank line break between groups
             }
             firstGrp = false;
-            lines.push(`"=== REQUIREMENT: ${rid.replace(/"/g, '""')} (${grp.length} test cases) ===","","","",""`);
+            lines.push(`"=== REQUIREMENT: ${rid.replace(/"/g, '""')} (${grp.length} test cases) ===","","","","",""`);
             for (const c of grp) {
               lines.push([
                 `"${(c.id || '').replace(/"/g, '""')}"`,
@@ -1507,6 +1508,7 @@
                 `"${(c.type || '').replace(/"/g, '""')}"`,
                 `"${(c.scenario || '').replace(/"/g, '""')}"`,
                 `"${(c.expected || '').replace(/"/g, '""')}"`,
+                `"${(c.source_ref || '').replace(/"/g, '""')}"`,
               ].join(','));
             }
           }

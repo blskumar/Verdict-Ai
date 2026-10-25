@@ -1,6 +1,8 @@
 """Tests for Package D: FastAPI Web Application & UI."""
 from __future__ import annotations
 
+import csv
+import io
 import json
 from io import BytesIO
 
@@ -286,6 +288,7 @@ def test_api_cases_export_grouped(client: TestClient) -> None:
     csv_text = resp_csv.text
     assert "REQUIREMENT: REQ-A (2 test cases)" in csv_text
     assert "REQUIREMENT: REQ-B (1 test cases)" in csv_text
+    assert csv_text.splitlines()[0].endswith(",source,source_ref")
     # Verify break between groups
     lines = csv_text.splitlines()
     assert any(line.strip() == "" for line in lines)
@@ -451,6 +454,12 @@ def test_recommended_scenarios_and_case_generation_counts_match(client: TestClie
 
 
 def test_evaluate_live_mode_fails_safe_to_human_review(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from verdict_ai.llm import ModelRouter, _RetryableError
+
+    def _down(self, model, messages):
+        raise _RetryableError("simulated outage")
+
+    monkeypatch.setattr(ModelRouter, "_post", _down)  # no real network
     monkeypatch.setenv("OPENROUTER_API_KEY", "")
     reqs = [{"id": "REQ-01", "title": "Req", "text": "Spec text."}]
     cases = [{
@@ -527,15 +536,11 @@ def test_api_upload_file_size_limit(client: TestClient) -> None:
     assert resp.status_code == 413
 
 
-def test_api_export_missing_case_id_handling(client: TestClient) -> None:
-    resp = client.post(
-        "/api/export/json",
-        json={"results": [{"decision": "approve"}]},  # Missing case_id
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert len(data) == 1
-    assert "case_id" in data[0]
+def test_api_export_rejects_missing_case_id_and_unknown_decision(client: TestClient) -> None:
+    missing_id = client.post("/api/export/json", json={"results": [{"decision": "approve"}]})
+    assert missing_id.status_code == 422 and "case_id" in missing_id.json()["detail"]
+    bad_decision = client.post("/api/export/csv", json={"results": [{"case_id": "TC-01", "decision": "maybe"}]})
+    assert bad_decision.status_code == 422 and "maybe" in bad_decision.json()["detail"]
 
 
 def test_api_cases_export_csv_formula_sanitization(client: TestClient) -> None:
@@ -582,3 +587,11 @@ def test_markdown_report_pipe_and_newline_escaping() -> None:
 
 
 
+
+
+def test_api_cases_export_csv_includes_source_ref(client: TestClient) -> None:
+    cases = [{"id": "TC-01", "requirement_id": "REQ-A", "type": "Calculation", "scenario": "s",
+              "expected": "Premium is $42.50", "source_ref": "Rate table RT-1"}]
+    rows = list(csv.reader(io.StringIO(client.post("/api/cases/export/csv", json=cases).text)))
+    assert rows[0][-1] == "source_ref"
+    assert rows[2][-1] == "Rate table RT-1"

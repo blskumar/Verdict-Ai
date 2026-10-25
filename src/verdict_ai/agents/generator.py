@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 
+from verdict_ai.agents._common import reply_is_valid
 from verdict_ai.llm import ModelRouter
 from verdict_ai.models import Requirement
 
@@ -89,7 +90,7 @@ def run_generator(
             {"role": "user", "content": _USER_TMPL.format(context=context or "None", items=items)},
         ]
         # AllModelsExhausted propagates: the caller must know generation failed.
-        raw, _model = router.chat(ROLE, messages)
+        raw, _model = router.chat(ROLE, messages, validate=reply_is_valid)
         parsed = _parse(raw, batch)
         output.extend(parsed)
     return output

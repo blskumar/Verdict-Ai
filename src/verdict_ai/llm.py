@@ -12,7 +12,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 import yaml
@@ -85,8 +85,13 @@ class ModelRouter:
         messages: list[dict],
         *,
         context: str = "",
+        validate: Callable[[str], bool] | None = None,
     ) -> tuple[str, str]:
-        """Return (raw_text, model_name). Raises AllModelsExhausted on total failure."""
+        """Return (raw_text, model_name). Raises AllModelsExhausted on total failure.
+
+        validate: when given, a reply is cached (and a cached reply reused) only if it returns True,
+        so one bad reply is never replayed from disk.
+        """
         if self._request_count >= self.request_cap:
             raise AllModelsExhausted("Request cap reached.")
 
@@ -97,7 +102,7 @@ class ModelRouter:
         # Cache check (try first available model only — keyed by model+messages)
         for model in models:
             cached = self._cache_get(model, messages)
-            if cached is not None:
+            if cached is not None and (validate is None or validate(cached)):
                 return cached, model
 
         last_exc: Exception | None = None
@@ -107,7 +112,8 @@ class ModelRouter:
             self._request_count += 1
             try:
                 text = self._post(model, messages)
-                self._cache_set(model, messages, text)
+                if validate is None or validate(text):
+                    self._cache_set(model, messages, text)
                 return text, model
             except _RetryableError as e:
                 self._cooldowns[model] = datetime.now() + timedelta(seconds=self.cooldown_seconds)
