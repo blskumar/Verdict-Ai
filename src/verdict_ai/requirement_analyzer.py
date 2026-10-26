@@ -13,6 +13,8 @@ from io import StringIO
 from typing import Any, Literal
 
 from verdict_ai.agents.analyst import run_analyst
+from verdict_ai.domain_review import hints_for
+from verdict_ai.domains import Pack
 from verdict_ai.llm import ModelRouter
 from verdict_ai.loader import Requirement, _universal_requirements_fallback
 from verdict_ai.models import CheckResult
@@ -93,8 +95,13 @@ def analyze_requirement(
     req: Requirement,
     *,
     model_check: CheckResult | None = None,
+    pack: Pack | None = None,
 ) -> RequirementAnalysis:
-    """Perform deterministic rule and model-assisted quality analysis on a single requirement."""
+    """Perform deterministic rule and model-assisted quality analysis on a single requirement.
+
+    pack: the selected domain pack. Its vague_terms and ambiguous_phrases are checked on top of the built-in
+    lists, and its boundary hints are offered as extra scenarios.
+    """
     issues: list[RequirementIssue] = []
     base_score = 1.0
     combined_text = f"{req.title} {req.text} {req.acceptance_criteria}".strip()
@@ -112,6 +119,23 @@ def analyze_requirement(
             )
         )
         base_score -= 0.15 * min(len(vague_words), 3)
+
+    if pack:
+        low = combined_text.lower()
+        pack_vague = [t for t in pack.vague_terms if re.search(rf"\b{re.escape(t.lower())}\b", low)]
+        if pack_vague:
+            issues.append(RequirementIssue(
+                code="domain_vague_terms", severity="warning",
+                message=f"Vague for {pack.name}: {', '.join(pack_vague)}.",
+                suggestion="Replace with the configured value, limit or named rule the domain uses."))
+            base_score -= 0.10 * min(len(pack_vague), 3)
+        pack_ambiguous = [p for p in pack.ambiguous_phrases if p.lower() in low]
+        if pack_ambiguous:
+            issues.append(RequirementIssue(
+                code="domain_ambiguous_phrases", severity="warning",
+                message=f"Ambiguous for {pack.name}: '{'; '.join(pack_ambiguous)}'.",
+                suggestion="Say who decides, on what condition, and what happens in each case."))
+            base_score -= 0.10 * min(len(pack_ambiguous), 2)
 
     # 2. Check for missing acceptance criteria
     if not req.acceptance_criteria or len(req.acceptance_criteria.strip()) < 10:
@@ -203,6 +227,11 @@ def analyze_requirement(
 
     # 7. Generate suggested test scenarios
     scenarios = _derive_suggested_scenarios(req, risk)
+    if pack:
+        scenarios += [{
+            "type": "Boundary", "scenario": f"{hint} ({pack.name}).",
+            "expected": "The outcome is stated on each side of the limit, and the limit itself is stated as inclusive or not.",
+        } for hint in hints_for(combined_text, pack)]
 
     return RequirementAnalysis(
         req_id=req.id,
@@ -260,6 +289,7 @@ def analyze_requirements(
     *,
     router: ModelRouter | None = None,
     context: str = "",
+    pack: Pack | None = None,
 ) -> list[RequirementAnalysis]:
     """Run comprehensive analysis over a list of requirements."""
     model_checks: dict[str, CheckResult] = {}
@@ -271,7 +301,7 @@ def analyze_requirements(
         except Exception:
             pass
 
-    return [analyze_requirement(r, model_check=model_checks.get(r.id)) for r in reqs]
+    return [analyze_requirement(r, model_check=model_checks.get(r.id), pack=pack) for r in reqs]
 
 
 def requirements_review_to_csv(analyses: list[RequirementAnalysis], reqs: list[Requirement] | None = None) -> str:

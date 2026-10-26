@@ -421,7 +421,7 @@ def test_recommended_scenarios_and_case_generation_counts_match(client: TestClie
         # 1. Analyze
         analyze_resp = client.post(
             "/api/requirements/analyze",
-            json={"requirements": test_reqs, "domain": "insurance/p-and-c/commercial-auto", "agent_mode": "mock"},
+            json={"requirements": test_reqs, "agent_mode": "mock"},  # mixed-domain data: no domain selected
         )
         assert analyze_resp.status_code == 200
         analysis_data = analyze_resp.json()
@@ -433,7 +433,7 @@ def test_recommended_scenarios_and_case_generation_counts_match(client: TestClie
         # 2. Generate cases
         gen_resp = client.post(
             "/api/requirements/generate-cases",
-            json={"requirements": test_reqs, "domain": "insurance/p-and-c/commercial-auto", "agent_mode": "mock"},
+            json={"requirements": test_reqs, "agent_mode": "mock"},  # mixed-domain data: no domain selected
         )
         assert gen_resp.status_code == 200
         cases = gen_resp.json()["cases"]
@@ -595,3 +595,57 @@ def test_api_cases_export_csv_includes_source_ref(client: TestClient) -> None:
     rows = list(csv.reader(io.StringIO(client.post("/api/cases/export/csv", json=cases).text)))
     assert rows[0][-1] == "source_ref"
     assert rows[2][-1] == "Rate table RT-1"
+
+
+def test_sample_data_follows_the_chosen_domain(client: TestClient) -> None:
+    bank = client.get("/api/sample", params={"domain": "banking/retail/checking"}).json()
+    assert bank["domain"] == "banking/retail/checking"
+    assert bank["requirements"] and all(r["id"].startswith("BANK") for r in bank["requirements"])
+    assert all(c["requirement_id"].startswith("BANK") for c in bank["cases"])
+    life = client.get("/api/sample", params={"domain": "insurance/life/term"}).json()
+    assert life["domain"] == "insurance/life/term"
+    assert life["requirements"] and all(r["id"].startswith("TERM") for r in life["requirements"])
+
+
+def test_wrong_domain_is_refused_with_a_clear_message(client: TestClient) -> None:
+    bank_req = [{"id": "BANK-REQ-001", "title": "Min deposit", "text": "Opening deposit of at least $25.00.",
+                 "acceptance_criteria": "Under $25.00 declined.", "domain": "banking/retail/checking"}]
+    for url, body in (
+        ("/api/requirements/analyze", {"requirements": bank_req, "domain": "insurance/life/term"}),
+        ("/api/requirements/generate-cases", {"requirements": bank_req, "domain": "insurance/life/term"}),
+    ):
+        resp = client.post(url, json=body)
+        assert resp.status_code == 422, url
+        assert "banking/retail/checking" in resp.json()["detail"] and "insurance/life/term" in resp.json()["detail"]
+    ok = client.post("/api/requirements/analyze", json={"requirements": bank_req, "domain": "banking/retail/checking"})
+    assert ok.status_code == 200
+
+
+def test_upload_in_the_wrong_domain_is_refused(client: TestClient) -> None:
+    import json as _json
+    payload = _json.dumps([{"id": "HOME-REQ-01", "title": "t", "text": "Capture property details.",
+                            "domain": "insurance/p-and-c/homeowners"}]).encode()
+    files = {"file": ("reqs.json", payload, "application/json")}
+    bad = client.post("/api/upload", files=files, data={"domain": "banking/retail/checking"})
+    assert bad.status_code == 422 and "insurance/p-and-c/homeowners" in bad.json()["detail"]
+    good = client.post("/api/upload", files=files, data={"domain": "insurance/p-and-c/homeowners"})
+    assert good.status_code == 200
+
+
+def test_analyze_returns_domain_review_and_uses_pack_terms(client: TestClient) -> None:
+    reqs = [{"id": "CHK-REQ-01", "title": "Overdraft", "text": "Overdraft handling is appropriate and secure.",
+             "acceptance_criteria": "Customers are notified in a timely manner.", "domain": "banking/retail/checking"}]
+    data = client.post("/api/requirements/analyze", json={"requirements": reqs, "domain": "banking/retail/checking"}).json()
+    codes = {i["code"] for i in data["analyses"][0]["issues"]}
+    assert "domain_vague_terms" in codes  # "secure", "timely" come from the banking pack
+    review = data["domain_review"]
+    assert any("waiver criteria" in p["title"] for p in review["proposed_requirements"])
+    assert set(review) == {"obsolete", "proposed_requirements", "extra_scenarios"}
+
+
+def test_domain_check_endpoint(client: TestClient) -> None:
+    reqs = [{"id": "TERM-REQ-01", "title": "t", "text": "Capture the term application."}]
+    ok = client.post("/api/domain/check", json={"domain": "insurance/life/term", "requirements": reqs}).json()
+    assert ok == {"ok": True, "message": None}
+    bad = client.post("/api/domain/check", json={"domain": "banking/retail/checking", "requirements": reqs}).json()
+    assert bad["ok"] is False and "banking/retail/checking" in bad["message"]

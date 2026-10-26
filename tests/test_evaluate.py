@@ -29,11 +29,12 @@ def test_run_evaluation_mock() -> None:
     assert report.good_cases == 75
     assert report.bad_cases == 33
 
-    # Quality KPI checks
-    assert report.catch_rate >= 0.80, f"Expected catch rate >= 0.80, got {report.catch_rate}"
+    # The mock models approve everything, so this is the rule-checks-only floor. It must not reach the 80%
+    # target (that needs real models) and must never wrongly reject good cases or leave a decision unexplained.
+    assert 0.40 <= report.catch_rate < 0.80, f"rules-only catch rate moved: {report.catch_rate}"
     assert report.false_reject_rate < 0.15, f"Expected false reject rate < 0.15, got {report.false_reject_rate}"
     assert report.reasons_compliance >= 0.99, f"Expected reasons compliance 100%, got {report.reasons_compliance}"
-    assert report.targets_met is True
+    assert report.targets_met is False
 
     # Defect breakdown checks
     assert len(report.defect_breakdown) > 0
@@ -58,6 +59,7 @@ def test_format_markdown_report() -> None:
     assert "False Reject Rate" in md
     assert "Defect Breakdown" in md
     assert "Models Used" in md
+    assert "Mock run" in md
 
 
 def test_save_evaluation(tmp_path: Path) -> None:

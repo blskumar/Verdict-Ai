@@ -59,10 +59,8 @@ class EvaluationReport:
         return asdict(self)
 
 
-def _build_evaluation_mock_router(
-    seeded_bad_meta: dict[str, dict[str, Any]],
-) -> ModelRouter:
-    """Build a deterministic mock router that understands defect patterns for offline bake-off."""
+def _build_evaluation_mock_router() -> ModelRouter:
+    """A deterministic stub router for offline runs. It reads no labels: it only checks the plumbing."""
     import re
 
     class EvalMockRouter(ModelRouter):
@@ -95,70 +93,13 @@ def _build_evaluation_mock_router(
             if not cids:
                 return "[]", f"mock-{role}:eval"
 
-            results = []
-            if role == "reviewer":
-                for cid in cids:
-                    if cid in seeded_bad_meta:
-                        meta = seeded_bad_meta[cid]
-                        defect = meta.get("defect", "")
-                        if defect in (
-                            "wrong_arithmetic", "wrong_boundary_outcome", "contradicts_requirement",
-                            "wrong_outcome", "vague_expected", "missing_step", "unverifiable",
-                            "compound_case", "near_duplicate", "ambiguous_outcome", "missing_expected",
-                            "out_of_scope",
-                        ):
-                            results.append({
-                                "case_id": cid,
-                                "passed": False,
-                                "score": 0.35,
-                                "reason": meta.get("defect_note") or f"Defect: {defect}",
-                            })
-                        else:
-                            results.append({
-                                "case_id": cid,
-                                "passed": True,
-                                "score": 0.88,
-                                "reason": "Scenario covers requirement criteria.",
-                            })
-                    else:
-                        results.append({
-                            "case_id": cid,
-                            "passed": True,
-                            "score": 0.94,
-                            "reason": "Scenario covers requirement criteria and steps are reproducible.",
-                        })
-                return json.dumps(results), "mock-reviewer:eval"
-
-            if role == "checker":
-                for cid in cids:
-                    if cid in seeded_bad_meta:
-                        meta = seeded_bad_meta[cid]
-                        defect = meta.get("defect", "")
-                        if defect in (
-                            "hallucinated_feature", "invented_field", "invented_value", "hallucination",
-                            "untraceable", "schema_mismatch", "contradicts_requirement",
-                        ):
-                            results.append({
-                                "case_id": cid,
-                                "passed": False,
-                                "score": 0.25,
-                                "reason": meta.get("defect_note") or f"Defect: {defect}",
-                            })
-                        else:
-                            results.append({
-                                "case_id": cid,
-                                "passed": True,
-                                "score": 0.92,
-                                "reason": "No hallucination detected; fields trace to requirements.",
-                            })
-                    else:
-                        results.append({
-                            "case_id": cid,
-                            "passed": True,
-                            "score": 0.95,
-                            "reason": "No hallucination detected; all fields trace to requirements.",
-                        })
-                return json.dumps(results), "mock-checker:eval"
+            if role in ("reviewer", "checker"):
+                # A stub: it approves every case and never looks at the seeded labels. In mock mode only the
+                # rule checks can catch a defect, so the numbers show what plain code alone achieves.
+                why = ("Scenario covers requirement criteria." if role == "reviewer"
+                       else "No hallucination detected; fields trace to requirements.")
+                results = [{"case_id": cid, "passed": True, "score": 0.94, "reason": why} for cid in cids]
+                return json.dumps(results), f"mock-{role}:eval"
 
             if role == "arbiter":
                 return "[]", "mock-arbiter:eval"
@@ -219,7 +160,7 @@ def run_evaluation(
 
     if use_agents:
         if agent_mode == "mock":
-            router = _build_evaluation_mock_router(seeded_bad_meta)
+            router = _build_evaluation_mock_router()
         else:
             router = ModelRouter()
 
@@ -366,9 +307,13 @@ def format_markdown_report(report: EvaluationReport) -> str:
     reject_pct = report.false_reject_rate * 100
     reason_pct = report.reasons_compliance * 100
 
+    is_mock = any("mock" in m for m in report.models_used)
     lines = [
         f"# Verdict AI — Evaluation Bake-off Report [{status_icon}]",
         "",
+        *(["> **Mock run.** The stand-in models approve every case, so only the rule checks can catch a defect. "
+           "This is the plain-code floor, not the full result. Run with `--mode live` for the real measurement.", ""]
+          if is_mock else []),
         f"> **Timestamp:** `{report.timestamp}` · **Total cases evaluated:** `{report.total_cases}`",
         "",
         "## Summary KPI Targets",

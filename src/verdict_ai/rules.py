@@ -126,8 +126,18 @@ def check_value_source(c: TestCase, req: Requirement | None = None, markers: lis
                     c.requirement_id)]
 
 
+def _pack_hit(terms: list[str], text: str, word: bool = False) -> str | None:
+    """First pack term found in the text (whole word when word=True), else None."""
+    low = text.lower()
+    for t in terms:
+        if (re.search(rf"\b{re.escape(t.lower())}\b", low) if word else t.lower() in low):
+            return t
+    return None
+
+
 def check_case(c: TestCase, req_ids: set[str], req: Requirement | None = None,
-               markers: list[str] = ()) -> list[Finding]:
+               markers: list[str] = (), vague: list[str] = (), ambiguous: list[str] = ()) -> list[Finding]:
+    """vague / ambiguous: the domain pack's own vague_terms and ambiguous_phrases, on top of the built-in lists."""
     out: list[Finding] = []
     rid = c.requirement_id
 
@@ -138,8 +148,12 @@ def check_case(c: TestCase, req_ids: set[str], req: Requirement | None = None,
         add("untraceable", "reject", f"Requirement {rid} does not exist, so the case traces to nothing.")
     if not c.expected.strip():
         add("missing_expected", "revise", "No expected result. A tester cannot pass or fail this case.")
-    elif VAGUE.search(c.expected):
+    # "successfully created ... balance of $25.00" is specific: a vague word next to a concrete figure is fine.
+    elif (VAGUE.search(c.expected) or _pack_hit(vague, c.expected, word=True)) and not re.search(r"\d", c.expected):
         add("vague_expected", "revise", f"Expected result is vague: '{c.expected.strip()}'. State the exact outcome.")
+    elif _pack_hit(ambiguous, c.expected) and not CONFIGURED.search(c.expected):
+        add("ambiguous_outcome", "human_review",
+            f"Expected result uses a phrase this domain treats as ambiguous: '{_pack_hit(ambiguous, c.expected)}'.")
     elif AMBIGUOUS.search(c.expected) and not CONFIGURED.search(c.expected):
         add("ambiguous_outcome", "human_review", "Expected result allows two outcomes. A person must decide which one is right.")
     if _is_compound(c):
@@ -180,5 +194,7 @@ def run_rules(reqs: list[Requirement], cases: list[TestCase], reference: list[Te
     ids = {r.id for r in reqs}
     by_id = {r.id: r for r in reqs}
     markers = list(getattr(pack, "source_markers", None) or [])
-    found = [f for c in cases for f in check_case(c, ids, by_id.get(c.requirement_id), markers)]
+    vague = list(getattr(pack, "vague_terms", None) or [])
+    ambiguous = list(getattr(pack, "ambiguous_phrases", None) or [])
+    found = [f for c in cases for f in check_case(c, ids, by_id.get(c.requirement_id), markers, vague, ambiguous)]
     return found + check_duplicates(cases, reference) + check_coverage(reqs, cases)

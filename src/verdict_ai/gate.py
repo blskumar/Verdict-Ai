@@ -121,6 +121,17 @@ class GateEngine:
             elif overall < self.approve_threshold:
                 best_decision = "human_review"
 
+        if not reasons:
+            # Every decision carries a reason, including approvals and score-floor decisions.
+            ran = f"{len(case_checks)} model check(s)" if case_checks else "no model check (rules only)"
+            if best_decision == "approve":
+                reasons.append(f"Approved: no rule finding and no failed check; mean score {overall:.2f} is at or above "
+                               f"the approval threshold {self.approve_threshold:.2f} ({ran}).")
+            elif best_decision == "human_review":
+                reasons.append(f"Mean score {overall:.2f} is below the approval threshold {self.approve_threshold:.2f}; a person should decide.")
+            else:
+                reasons.append(f"Mean score {overall:.2f} is below the review band ({self.human_review_min:.2f}); rework the case.")
+
         return GateResult(
             case_id=case_id,
             decision=best_decision,
