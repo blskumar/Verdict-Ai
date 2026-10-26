@@ -119,9 +119,18 @@ def run_profile(pw, base: str, label: str, engine: str, channel: str | None, dev
 
     # theme
     html_dark = page.evaluate("document.documentElement.classList.contains('dark')")
-    check("theme_follows_device_scheme", html_dark == (scheme == "dark"), f"dark class={html_dark} for scheme={scheme}")
-    page.get_by_role("button", name=re.compile("Toggle Theme")).click()
-    flipped = page.evaluate("document.documentElement.classList.contains('dark')")
+    # compare with what the browser itself reports: the cached Firefox build ignores scheme emulation
+    device_dark = page.evaluate("matchMedia('(prefers-color-scheme: dark)').matches")
+    if device_dark != (scheme == "dark"):
+        res["notes"].append(f"scheme emulation not honoured by this browser build (asked {scheme}, it reports dark={device_dark})")
+    check("theme_follows_device_scheme", html_dark == device_dark, f"dark class={html_dark} but device dark={device_dark}")
+    # the toggle cycles system -> light -> dark -> system, so one of the first two clicks must flip the look
+    flipped = html_dark
+    for _ in range(2):
+        page.get_by_role("button", name=re.compile("Toggle Theme")).click()
+        flipped = page.evaluate("document.documentElement.classList.contains('dark')")
+        if flipped != html_dark:
+            break
     check("theme_toggle_flips", flipped != html_dark)
     page.reload(wait_until="load")
     wait_js(page, "typeof loadSampleData === 'function'", 20000)

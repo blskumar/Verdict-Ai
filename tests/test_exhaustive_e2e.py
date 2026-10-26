@@ -1088,3 +1088,23 @@ def test_csp_does_not_allow_external_script_hosts(client):
 def test_page_escapes_requirement_text_in_source(client):
     page = client.get("/").text
     assert "${r.title || r.id}" not in page and "${r.text || ''}" not in page and "${message}</div>" not in page and "${sc.scenario}" not in page
+
+
+# ============================================================ 16. UI source regressions (theme, layout, tap targets)
+
+def test_theme_is_applied_before_first_paint_and_has_three_modes(client):
+    page = client.get("/").text
+    head = page.split("</head>")[0]
+    assert "verdict_theme" in head and "prefers-color-scheme" in head, "theme must be set in <head>, before the body paints"
+    for icon in ("themeIconSystem", "themeIconSun", "themeIconMoon"):
+        assert icon in page
+    assert "THEME_NEXT" in page and "system: 'light', light: 'dark', dark: 'system'" in page
+    assert 'aria-label="Toggle Theme"' in page
+
+
+def test_toolbars_wrap_and_controls_are_at_least_24px(client):
+    page = client.get("/").text
+    assert 'class="flex flex-wrap items-center gap-1.5"' in page
+    assert "px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background" not in page, "old 19px-high buttons are back"
+    assert "w-full h-2 bg-muted" not in page, "8px-high slider is back"
+    assert page.count("min-h-[24px]") >= 8
