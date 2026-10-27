@@ -11,3 +11,5 @@ boundary_hints:
   - DTI exactly 43.0% vs 43.1%.
   - FICO score at credit tier threshold (e.g., 679 vs 680).
   - Loan term outside allowed durations (e.g., 12, 24, 36, 48, 60 months).
+obsolete_terms:
+  incurred loss: Replaced by the CECL model (ASC 326, current expected credit losses) for loan loss allowances.

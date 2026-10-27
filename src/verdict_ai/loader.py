@@ -494,6 +494,17 @@ def _requirements_from_docx(path: Path) -> list[Requirement]:
     return reqs
 
 
+def _xlsx_header_row(rows: list) -> int:
+    """Index of the first row (within the first 15) that has an ID-like and a text-like heading, else 0."""
+    for i, row in enumerate(rows[:15]):
+        cells = [str(c or "").lower().strip().replace(" ", "_") for c in row]
+        has_id = any("req" in h or h in ("id", "story_id") for h in cells)
+        has_text = sum(1 for h in cells if any(k in h for k in ("desc", "requirement", "statement", "text", "title", "name"))) >= 1
+        if has_id and has_text and sum(1 for c in cells if c) >= 2:
+            return i
+    return 0
+
+
 def _requirements_from_xlsx(path: Path | io.BytesIO) -> list[Requirement]:
     if not _HAS_OPENPYXL:
         raise LoadError("openpyxl is not installed to process .xlsx files.")
@@ -517,22 +528,26 @@ def _requirements_from_xlsx(path: Path | io.BytesIO) -> list[Requirement]:
         if not rows or len(rows) < 2:
             continue
 
-        header = [str(c or "").lower().strip().replace(" ", "_") for c in rows[0]]
+        # The header is not always row 1: catalogues put a title and notes above it.
+        head_at = _xlsx_header_row(rows)
+        header = [str(c or "").lower().strip().replace(" ", "_") for c in rows[head_at]]
         id_col = next((i for i, h in enumerate(header) if "req" in h or h in ("id", "story_id")), -1)
         title_col = next((i for i, h in enumerate(header) if "name" in h or "title" in h or "subdomain" in h), -1)
-        text_col = next((i for i, h in enumerate(header) if "desc" in h or "requirement" in h or "details" in h or "text" in h), -1)
-        ac_col = next((i for i, h in enumerate(header) if "acceptance" in h or "criteria" in h or "ac" in h), -1)
+        # the ID column ("Requirement ID") also contains the word "requirement": never take it as the text
+        text_col = next((i for i, h in enumerate(header) if i != id_col and ("desc" in h or "requirement" in h or "details" in h or "text" in h)), -1)
+        ac_col = next((i for i, h in enumerate(header) if "acceptance" in h or "criteria" in h or "ac" in h or "test_focus" in h), -1)
         risk_col = next((i for i, h in enumerate(header) if "prio" in h or "risk" in h), -1)
 
         if id_col != -1 and (title_col != -1 or text_col != -1 or ac_col != -1):
-            for r in rows[1:]:
+            for r in rows[head_at + 1:]:
                 if not r or not r[id_col]:
                     continue
                 rid = str(r[id_col]).strip()
                 if not _is_valid_req_id(rid):
                     continue
-                title = str(r[title_col]).strip() if title_col != -1 and r[title_col] else rid
-                text = str(r[text_col]).strip() if text_col != -1 and r[text_col] else title
+                text = str(r[text_col]).strip() if text_col != -1 and r[text_col] else ""
+                title = str(r[title_col]).strip() if title_col != -1 and r[title_col] else (text[:80].rstrip() or rid)
+                text = text or title
                 ac = str(r[ac_col]).strip() if ac_col != -1 and r[ac_col] else ""
                 risk_val = None
                 if risk_col != -1 and r[risk_col]:
@@ -639,6 +654,8 @@ def _cases_from_csv(path: Path, source: str) -> list[TestCase]:
                 mapped["scenario"] = val
             elif lk in ("expected", "expected_result", "expected_results", "outcome"):
                 mapped["expected"] = val
+            elif lk in ("source_ref", "source_reference", "reference", "cites", "rate_table", "expected_source"):
+                mapped["source_ref"] = val
             elif lk in ("type", "test_type", "case_type"):
                 try:
                     mapped["type"] = CaseType(val)

@@ -4,13 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verdict AI — Test Case Gatekeeper</title>
+  <script>
+    // Applied before first paint: saved choice (light / dark / system), else follow the device.
+    (function () {
+      try {
+        var mode = localStorage.getItem('verdict_theme') || 'system';
+        var dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (e) { /* storage blocked: keep the default */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- Tailwind CSS Play CDN with custom theme config -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Served from this app (static/vendor): no third-party script runs in the page, and it works offline.
+       Tailwind 3.4.17 (MIT) from cdn.tailwindcss.com, Lucide 1.61.0 (ISC) from unpkg.com. -->
+  <script src="/static/vendor/tailwindcss-3.4.17.js"></script>
+  <script src="/static/vendor/lucide-1.61.0.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -142,9 +153,10 @@
         </a>
 
         <!-- Theme Toggle Button -->
-        <button id="themeToggle" onclick="toggleTheme()" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring" title="Toggle Theme (Light / Dark)">
+        <button id="themeToggle" onclick="toggleTheme()" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring" title="Toggle Theme" aria-label="Toggle Theme">
+          <i id="themeIconSystem" data-lucide="monitor" class="w-4 h-4"></i>
           <i id="themeIconSun" data-lucide="sun" class="w-4 h-4 hidden"></i>
-          <i id="themeIconMoon" data-lucide="moon" class="w-4 h-4"></i>
+          <i id="themeIconMoon" data-lucide="moon" class="w-4 h-4 hidden"></i>
         </button>
       </div>
     </div>
@@ -185,7 +197,7 @@
             </div>
             <input type="range" id="threshSlider" min="0.5" max="0.95" step="0.05" value="0.85" 
                    oninput="document.getElementById('threshDisplay').textContent = Math.round(this.value * 100) + '%'"
-                   class="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                   class="w-full h-6 py-2 bg-clip-content bg-muted rounded-lg appearance-none cursor-pointer accent-indigo-600">
           </div>
         </div>
 
@@ -251,7 +263,7 @@
             <h2 class="text-sm font-bold text-foreground">Requirements Specification</h2>
             <span id="reqCountBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted text-muted-foreground">0 loaded</span>
           </div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex flex-wrap items-center gap-1.5">
             <button onclick="openPasteModal()" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm" title="Paste Raw Text / User Stories">
               <i data-lucide="clipboard-paste" class="w-3 h-3 text-sky-500"></i>
               <span>Paste</span>
@@ -266,16 +278,16 @@
             </button>
 
             <!-- Export Review Group -->
-            <div class="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/70" title="Download Reviewed Requirements Specification with Quality Analysis & Remediation Guide">
+            <div class="flex flex-wrap items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/70" title="Download Reviewed Requirements Specification with Quality Analysis & Remediation Guide">
               <span class="text-[10px] font-bold text-muted-foreground px-1 flex items-center gap-0.5">
                 <i data-lucide="download" class="w-2.5 h-2.5 text-indigo-500"></i> Review:
               </span>
-              <button onclick="downloadRequirementReview('csv')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as CSV (for Excel / Sheets)">CSV</button>
-              <button onclick="downloadRequirementReview('md')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as Markdown">MD</button>
-              <button onclick="downloadRequirementReview('json')" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as JSON">JSON</button>
+              <button onclick="downloadRequirementReview('csv')" class="px-2 py-1 min-h-[24px] min-w-[24px] text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as CSV (for Excel / Sheets)">CSV</button>
+              <button onclick="downloadRequirementReview('md')" class="px-2 py-1 min-h-[24px] min-w-[24px] text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as Markdown">MD</button>
+              <button onclick="downloadRequirementReview('json')" class="px-2 py-1 min-h-[24px] min-w-[24px] text-[10px] font-semibold rounded bg-background hover:bg-muted text-foreground transition-all shadow-xs" title="Download Review as JSON">JSON</button>
             </div>
 
-            <button onclick="clearRequirements()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
+            <button onclick="clearRequirements()" class="px-2 py-1 min-h-[24px] min-w-[24px] text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
           </div>
         </div>
 
@@ -290,6 +302,9 @@
           </div>
           <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold shrink-0">Analyzing</span>
         </div>
+
+        <!-- Domain review: outdated items, proposed requirements, scenarios still needed -->
+        <div id="domainReviewPanel" class="hidden mb-2.5 p-2.5 rounded-lg border border-border bg-muted/40 text-xs space-y-2"></div>
 
         <!-- Requirements Analysis KPI summary bar -->
         <div id="reqAnalysisSummaryBar" class="hidden mb-2.5 p-2 rounded-lg border border-border bg-muted/40 text-xs flex flex-wrap items-center justify-between gap-2">
@@ -308,7 +323,7 @@
               <i data-lucide="flag" class="w-2.5 h-2.5 text-indigo-500"></i>
               <span id="summaryPriority">P0: 0 | P1: 0 | P2: 0</span>
             </span>
-            <button onclick="downloadRequirementReview('csv')" class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 font-semibold text-[10px] rounded bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" title="Download full review scorecard with Priority and Risk Score as CSV">
+            <button onclick="downloadRequirementReview('csv')" class="ml-1 inline-flex items-center gap-1 px-2 py-1 min-h-[24px] min-w-[24px] font-semibold text-[10px] rounded bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" title="Download full review scorecard with Priority and Risk Score as CSV">
               <i data-lucide="download" class="w-2.5 h-2.5"></i> Export Review
             </button>
           </div>
@@ -325,13 +340,13 @@
 
       <!-- Test Cases Card -->
       <div class="p-5 rounded-xl border border-border bg-card shadow-sm flex flex-col h-[400px]">
-        <div class="flex items-center justify-between pb-3 border-b border-border/70 mb-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/70 mb-3">
           <div class="flex items-center gap-2">
             <i data-lucide="list-checks" class="w-4 h-4 text-emerald-500"></i>
             <h2 class="text-sm font-bold text-foreground">Candidate Test Cases</h2>
             <span id="caseCountBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted text-muted-foreground">0 loaded</span>
           </div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex flex-wrap items-center gap-1.5">
             <button onclick="downloadCandidateCases('json')" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded border border-border bg-background hover:bg-muted text-foreground transition-all shadow-sm" title="Download Candidate Test Cases as JSON">
               <i data-lucide="download" class="w-3 h-3 text-emerald-500"></i>
               <span>JSON</span>
@@ -340,7 +355,7 @@
               <i data-lucide="download" class="w-3 h-3 text-emerald-500"></i>
               <span>CSV</span>
             </button>
-            <button onclick="clearCases()" class="text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
+            <button onclick="clearCases()" class="px-2 py-1 min-h-[24px] min-w-[24px] text-xs text-muted-foreground hover:text-rose-500 transition-colors ml-1">Clear</button>
           </div>
         </div>
 
@@ -494,7 +509,7 @@
   <footer class="border-t border-border/60 py-4 mt-auto text-center text-xs text-muted-foreground">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
       <p>Verdict AI — Test Case Gate Engine with Failover & Multi-Agent Consensus</p>
-      <p class="font-mono text-[11px]">71 unit & integration tests passing</p>
+      <p class="font-mono text-[11px]">Models advise; plain code makes every decision</p>
     </div>
   </footer>
 
@@ -516,24 +531,39 @@
     }
 
     // Theme Management
+    const THEME_NEXT = { system: 'light', light: 'dark', dark: 'system' };
+
+    let themeMemory = null;  // used when storage is blocked, so the toggle still cycles during this visit
+
+    function themeMode() {
+      if (themeMemory) return themeMemory;
+      try { return localStorage.getItem('verdict_theme') || 'system'; } catch (e) { return 'system'; }
+    }
+
+    function applyTheme() {
+      const mode = themeMode();
+      const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', dark);
+      document.getElementById('themeIconSystem').classList.toggle('hidden', mode !== 'system');
+      document.getElementById('themeIconSun').classList.toggle('hidden', mode !== 'light');
+      document.getElementById('themeIconMoon').classList.toggle('hidden', mode !== 'dark');
+      const label = `Toggle Theme (now ${mode}, next ${THEME_NEXT[mode] || 'light'})`;
+      const btn = document.getElementById('themeToggle');
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+    }
+
     function initTheme() {
-      const savedTheme = localStorage.getItem('verdict_theme') || 'dark';
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.getElementById('themeIconMoon').classList.remove('hidden');
-        document.getElementById('themeIconSun').classList.add('hidden');
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.getElementById('themeIconSun').classList.remove('hidden');
-        document.getElementById('themeIconMoon').classList.add('hidden');
-      }
+      applyTheme();
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (themeMode() === 'system') applyTheme();
+      });
     }
 
     function toggleTheme() {
-      const isDark = document.documentElement.classList.toggle('dark');
-      localStorage.setItem('verdict_theme', isDark ? 'dark' : 'light');
-      document.getElementById('themeIconMoon').classList.toggle('hidden', !isDark);
-      document.getElementById('themeIconSun').classList.toggle('hidden', isDark);
+      themeMemory = THEME_NEXT[themeMode()] || 'light';
+      try { localStorage.setItem('verdict_theme', themeMemory); } catch (e) { /* memory copy still works */ }
+      applyTheme();
     }
 
     // Populate Domain List
@@ -567,7 +597,7 @@
     // Load Sample Data
     async function loadSampleData() {
       try {
-        const res = await fetch('/api/sample');
+        const res = await fetch('/api/sample?domain=' + encodeURIComponent(document.getElementById('domainSelect').value));
         if (!res.ok) throw new Error("Could not load sample data");
         const data = await res.json();
         
@@ -575,6 +605,7 @@
         currentCases = data.cases || [];
         currentAnalyses = {};
         currentAnalysisSummary = null;
+        currentDomainReview = null; renderDomainReview();
         const bar = document.getElementById('reqAnalysisSummaryBar');
         if (bar) bar.classList.add('hidden');
 
@@ -593,6 +624,7 @@
       currentRequirements = [];
       currentAnalyses = {};
       currentAnalysisSummary = null;
+      currentDomainReview = null; renderDomainReview();
       const bar = document.getElementById('reqAnalysisSummaryBar');
       if (bar) bar.classList.add('hidden');
       renderRequirementsList();
@@ -629,7 +661,7 @@
       toast.className = `pointer-events-auto p-3.5 rounded-xl border ${borderClass} shadow-xl flex items-start gap-2.5 text-xs transition-all duration-300 transform translate-y-2 opacity-0`;
       toast.innerHTML = `
         ${icon}
-        <div class="flex-1 font-medium leading-relaxed">${message}</div>
+        <div class="flex-1 font-medium leading-relaxed">${escapeHtml(message)}</div>
       `;
 
       container.appendChild(toast);
@@ -693,6 +725,7 @@
         currentRequirements = data.requirements;
         currentAnalyses = {};
         currentAnalysisSummary = null;
+        currentDomainReview = null; renderDomainReview();
         document.getElementById('reqAnalysisSummaryBar').classList.add('hidden');
         renderRequirementsList();
         closePasteModal();
@@ -701,6 +734,58 @@
         showToast(`Recognition error: ${err.message}`, 'error');
         alert('Recognition error: ' + err.message);
       }
+    }
+
+    let currentDomainReview = null;
+
+    // Selecting another domain while data is loaded: say right away if the data does not fit.
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('domainSelect').addEventListener('change', async (ev) => {
+        if (!currentRequirements.length && !currentCases.length) return;
+        try {
+          const res = await fetch('/api/domain/check', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain: ev.target.value, requirements: currentRequirements, cases: currentCases }),
+          });
+          const out = await res.json();
+          if (!out.ok) { showToast(out.message, 'error'); alert(out.message); }
+        } catch (e) { /* the actions below still check again */ }
+      });
+    });
+
+    function renderDomainReview() {
+      const panel = document.getElementById('domainReviewPanel');
+      const dr = currentDomainReview;
+      if (!dr || !(dr.obsolete.length || dr.proposed_requirements.length || dr.extra_scenarios.length)) {
+        panel.classList.add('hidden');
+        panel.innerHTML = '';
+        return;
+      }
+      const section = (title, items) => items.length
+        ? `<div><div class="font-bold text-foreground mb-1">${title} (${items.length})</div><ul class="space-y-1">${items.join('')}</ul></div>` : '';
+      const li = (html) => `<li class="text-[11px] text-muted-foreground">${html}</li>`;
+      panel.innerHTML =
+        `<div class="font-bold text-foreground flex items-center gap-1"><i data-lucide="compass" class="w-3 h-3 text-indigo-500"></i> Domain review</div>` +
+        section('Possibly outdated', dr.obsolete.map(o =>
+          li(`<span class="font-mono text-foreground/80">${escapeHtml(o.id)}</span> (${escapeHtml(o.kind)}): "${escapeHtml(o.term)}". ${escapeHtml(o.reason)}`))) +
+        section('Proposed requirements', dr.proposed_requirements.map((p, i) =>
+          li(`<span class="font-semibold text-foreground/80">${escapeHtml(p.title)}</span>. ${escapeHtml(p.reason)} ` +
+             `<button onclick="addProposedRequirement(${i})" class="ml-1 px-2 py-1 min-h-[24px] min-w-[24px] rounded border border-border bg-background hover:bg-muted text-foreground">Add</button>`))) +
+        section('Scenarios still needed', dr.extra_scenarios.map(s =>
+          li(`<span class="font-mono text-foreground/80">${escapeHtml(s.requirement_id)}</span>: ${escapeHtml(s.scenario)}`)));
+      panel.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function addProposedRequirement(i) {
+      const p = currentDomainReview && currentDomainReview.proposed_requirements[i];
+      if (!p) return;
+      currentRequirements.push({ id: p.id, title: p.title, text: p.text, acceptance_criteria: '', risk: p.risk,
+                                 domain: document.getElementById('domainSelect').value });
+      currentDomainReview.proposed_requirements.splice(i, 1);
+      renderRequirementsList();
+      renderDomainReview();
+      showToast(`Added ${p.id}. Edit its text before generating cases.`, 'success');
     }
 
     async function analyzeRequirementsAction() {
@@ -723,6 +808,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             requirements: currentRequirements,
+            cases: currentCases,
             domain: document.getElementById('domainSelect').value,
             agent_mode: document.getElementById('agentModeSelect').value,
           }),
@@ -733,6 +819,8 @@
           currentAnalyses[a.req_id] = a;
         }
         currentAnalysisSummary = data.summary;
+        currentDomainReview = data.domain_review || null;
+        renderDomainReview();
 
         // Render summary bar
         const bar = document.getElementById('reqAnalysisSummaryBar');
@@ -858,15 +946,15 @@
           if (a.suggested_scenarios && a.suggested_scenarios.length) {
             scenariosHtml = `
               <details class="text-[11px] pt-1 text-muted-foreground">
-                <summary class="cursor-pointer hover:text-foreground font-semibold flex items-center gap-1 select-none">
+                <summary class="cursor-pointer hover:text-foreground font-semibold flex items-center gap-1 select-none min-h-[24px]">
                   <i data-lucide="list-plus" class="w-3 h-3 text-indigo-500"></i>
                   <span>${a.suggested_scenarios.length} Recommended Test Scenarios</span>
                 </summary>
                 <div class="pl-4 pt-1.5 space-y-1">
                   ${a.suggested_scenarios.map(sc => `
                     <div class="flex items-start gap-1.5 text-[10px]">
-                      <span class="font-mono text-[9px] uppercase font-bold px-1 rounded bg-muted text-muted-foreground shrink-0">${sc.type}</span>
-                      <span>${sc.scenario}</span>
+                      <span class="font-mono text-[9px] uppercase font-bold px-1 rounded bg-muted text-muted-foreground shrink-0">${escapeHtml(sc.type)}</span>
+                      <span>${escapeHtml(sc.scenario)}</span>
                     </div>
                   `).join('')}
                 </div>
@@ -899,8 +987,8 @@
               </div>
               <div>${scoreBadge}</div>
             </div>
-            <p class="text-xs font-semibold text-foreground">${r.title || r.id}</p>
-            <p class="text-[11px] text-muted-foreground line-clamp-2">${r.text || ''}</p>
+            <p class="text-xs font-semibold text-foreground">${escapeHtml(r.title || r.id)}</p>
+            <p class="text-[11px] text-muted-foreground line-clamp-2">${escapeHtml(r.text || '')}</p>
             ${r.acceptance_criteria ? `<p class="text-[10px] text-muted-foreground/80 italic line-clamp-1"><span class="font-semibold not-italic">AC:</span> ${escapeHtml(r.acceptance_criteria)}</p>` : ''}
             ${issuesHtml}
             ${scenariosHtml}
@@ -954,6 +1042,7 @@
             </div>
             <p class="text-xs text-foreground font-medium"><span class="text-muted-foreground">Scenario:</span> ${escapeHtml(tc.scenario || '')}</p>
             <p class="text-[11px] text-muted-foreground"><span class="font-semibold text-foreground/80">Expected:</span> ${escapeHtml(tc.expected || '')}</p>
+            ${tc.source_ref ? `<p class="text-[11px] text-muted-foreground"><span class="font-semibold text-foreground/80">Source:</span> ${escapeHtml(tc.source_ref)}</p>` : ''}
           </div>
         `).join('');
 
@@ -1009,6 +1098,7 @@
         }
       }
 
+      formData.append('domain', document.getElementById('domainSelect').value);
       showToast(`Uploading ${files.length} file(s)...`, 'info');
 
       try {
@@ -1040,6 +1130,7 @@
           currentRequirements = data.requirements;
           currentAnalyses = {};
           currentAnalysisSummary = null;
+          currentDomainReview = null; renderDomainReview();
           const bar = document.getElementById('reqAnalysisSummaryBar');
           if (bar) bar.classList.add('hidden');
           loadedReqCount = data.requirements.length;
@@ -1345,7 +1436,7 @@
 
           const analysisBlock = r.analysis ? `
             <details class="text-[11px] text-muted-foreground mt-2 group">
-              <summary class="cursor-pointer font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 select-none py-0.5">
+              <summary class="cursor-pointer font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 select-none py-0.5 min-h-[24px]">
                 <i data-lucide="microscope" class="w-3.5 h-3.5"></i>
                 <span>Decision Analysis (5 Dimensions)</span>
               </summary>
@@ -1491,15 +1582,15 @@
             if (!groups[rid]) groups[rid] = [];
             groups[rid].push(c);
           }
-          const headers = ['id', 'requirement_id', 'type', 'scenario', 'expected'];
+          const headers = ['id', 'requirement_id', 'type', 'scenario', 'expected', 'source_ref'];
           const lines = [headers.join(',')];
           let firstGrp = true;
           for (const [rid, grp] of Object.entries(groups)) {
             if (!firstGrp) {
-              lines.push(',,,,'); // Blank line break between groups
+              lines.push(',,,,,'); // Blank line break between groups
             }
             firstGrp = false;
-            lines.push(`"=== REQUIREMENT: ${rid.replace(/"/g, '""')} (${grp.length} test cases) ===","","","",""`);
+            lines.push(`"=== REQUIREMENT: ${rid.replace(/"/g, '""')} (${grp.length} test cases) ===","","","","",""`);
             for (const c of grp) {
               lines.push([
                 `"${(c.id || '').replace(/"/g, '""')}"`,
@@ -1507,6 +1598,7 @@
                 `"${(c.type || '').replace(/"/g, '""')}"`,
                 `"${(c.scenario || '').replace(/"/g, '""')}"`,
                 `"${(c.expected || '').replace(/"/g, '""')}"`,
+                `"${(c.source_ref || '').replace(/"/g, '""')}"`,
               ].join(','));
             }
           }

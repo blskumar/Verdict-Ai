@@ -76,13 +76,15 @@ def test_analyst_model_name_recorded():
     assert results[0].model_name == "mock-model"
 
 
-def test_analyst_bad_json_falls_back_neutral():
+def test_analyst_bad_json_is_unjudged_with_reason():
     reqs = [_req()]
     router = _mock_router("this is not json at all", "analyst")
     results = run_analyst(router, reqs)
     assert len(results) == 1
-    assert results[0].passed is True          # fallback neutral
-    assert results[0].score == pytest.approx(0.5)
+    # an unusable reply is "unjudged": failed, scored in the human-review band, with a reason
+    assert results[0].passed is False
+    assert results[0].score == pytest.approx(0.72)
+    assert "not valid JSON" in results[0].reason
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +256,7 @@ def _make_orchestrator(role_responses: dict[str, str]) -> Orchestrator:
             # return first available response
             return next(iter(self._responses.values()))
 
-        def chat(self, role, messages, *, context=""):
+        def chat(self, role, messages, *, context="", validate=None):
             return self._responses.get(role, "[]"), "mock-model"
 
     return Orchestrator(MultiMockRouter())
@@ -381,7 +383,7 @@ def test_reviewer_shuffled_order_matches_by_case_id():
     assert res_map["TC-02"].passed is False
 
 
-def test_checker_missing_case_falls_back_neutral():
+def test_checker_missing_case_is_unjudged():
     cases = [_case("TC-01"), _case("TC-02")]
     reqs = [_req()]
     # Model only returned 1 result for 2 cases
@@ -393,7 +395,9 @@ def test_checker_missing_case_falls_back_neutral():
     assert len(results) == 2
     res_map = {r.case_id: r for r in results}
     assert res_map["TC-01"].passed is True
-    assert res_map["TC-02"].score == pytest.approx(0.5)
+    assert res_map["TC-02"].passed is False
+    assert res_map["TC-02"].score == pytest.approx(0.72)
+    assert "no evaluation" in res_map["TC-02"].reason.lower()
 
 
 def test_case_type_security():
@@ -413,16 +417,17 @@ def test_reviewer_omitted_middle_case_does_not_inherit_positional_result():
     results = run_reviewer(router, cases, reqs)
     res_map = {r.case_id: r for r in results}
     assert res_map["TC-A"].score == pytest.approx(0.95)
-    # B was omitted: must be neutral (0.5), NOT C's score (0.30)
-    assert res_map["TC-B"].score == pytest.approx(0.5)
-    assert "No evaluation returned" in res_map["TC-B"].reason
+    # B was omitted: unjudged (0.72, failed, with a reason), NOT C's score (0.30)
+    assert res_map["TC-B"].score == pytest.approx(0.72)
+    assert res_map["TC-B"].passed is False
+    assert "no evaluation" in res_map["TC-B"].reason.lower()
     assert res_map["TC-C"].score == pytest.approx(0.30)
 
 
 def test_agent_handles_malformed_scores_and_types_safely():
     cases = [_case("TC-01"), _case("TC-02"), _case("TC-03"), _case("TC-04")]
     reqs = [_req()]
-    # score out of range (1.5), score string ('high'), score None, and unhashable case_id
+    # score out of range (1.5), score string ('high'), score None, and unhashable case_id: all unjudged
     reply = json.dumps([
         {"case_id": "TC-01", "passed": True, "score": 1.5, "reason": "Clamped to 1.0"},
         {"case_id": "TC-02", "passed": True, "score": "high", "reason": "Invalid score defaulted"},
@@ -432,9 +437,9 @@ def test_agent_handles_malformed_scores_and_types_safely():
     router = _mock_router(reply, "reviewer")
     results = run_reviewer(router, cases, reqs)
     res_map = {r.case_id: r for r in results}
-    assert res_map["TC-01"].score == pytest.approx(1.0)
-    assert res_map["TC-02"].score == pytest.approx(0.5)
-    assert res_map["TC-03"].score == pytest.approx(0.5)
-    # TC-04 had unhashable id in reply so treated as neutral
-    assert res_map["TC-04"].score == pytest.approx(0.5)
+    # An out-of-range or unreadable score is never turned into a verdict: 1.5 must not become a perfect 1.0.
+    for cid in ("TC-01", "TC-02", "TC-03", "TC-04"):
+        assert res_map[cid].passed is False, cid
+        assert res_map[cid].score == pytest.approx(0.72), cid
+        assert res_map[cid].reason, cid
 

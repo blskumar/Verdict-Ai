@@ -12,7 +12,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 import yaml
@@ -85,8 +85,13 @@ class ModelRouter:
         messages: list[dict],
         *,
         context: str = "",
+        validate: Callable[[str], bool] | None = None,
     ) -> tuple[str, str]:
-        """Return (raw_text, model_name). Raises AllModelsExhausted on total failure."""
+        """Return (raw_text, model_name). Raises AllModelsExhausted on total failure.
+
+        validate: when given, a reply is cached (and a cached reply reused) only if it returns True,
+        so one bad reply is never replayed from disk.
+        """
         if self._request_count >= self.request_cap:
             raise AllModelsExhausted("Request cap reached.")
 
@@ -97,22 +102,34 @@ class ModelRouter:
         # Cache check (try first available model only — keyed by model+messages)
         for model in models:
             cached = self._cache_get(model, messages)
-            if cached is not None:
+            if cached is not None and (validate is None or validate(cached)):
                 return cached, model
 
         last_exc: Exception | None = None
+        last_bad: tuple[str, str] | None = None
         for model in models:
             if self._request_count >= self.request_cap:
                 raise AllModelsExhausted("Request cap reached during failover.")
             self._request_count += 1
             try:
                 text = self._post(model, messages)
-                self._cache_set(model, messages, text)
-                return text, model
             except _RetryableError as e:
                 self._cooldowns[model] = datetime.now() + timedelta(seconds=self.cooldown_seconds)
                 last_exc = e
+                continue
+            if validate is None or validate(text):
+                self._cache_set(model, messages, text)
+                self._bad_json_streak[model] = 0
+                return text, model
+            # unusable reply (empty, not JSON): try the next model; two in a row cool this one down
+            streak = self._bad_json_streak.get(model, 0) + 1
+            self._bad_json_streak[model] = streak
+            if streak >= 2:
+                self._cooldowns[model] = datetime.now() + timedelta(seconds=self.cooldown_seconds)
+            last_bad = (text, model)
 
+        if last_bad is not None:
+            return last_bad  # caller marks the case "unjudged"
         raise AllModelsExhausted(
             f"All models exhausted for role '{role}'. Last: {last_exc}"
         )
@@ -202,8 +219,12 @@ class ModelRouter:
         if resp.status_code != 200:
             raise _RetryableError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        try:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            # HTTP 200 with an error body (provider error, rate limit) has no "choices"
+            raise _RetryableError(f"Malformed reply: {resp.text[:200]}") from e
 
     def _cache_key(self, model: str, messages: list[dict]) -> str:
         raw = json.dumps({"model": model, "messages": messages}, sort_keys=True)

@@ -92,32 +92,63 @@ def web(
 
 @app.command()
 def evaluate(
-    requirements: Path = typer.Option("data/requirements/insurance_requirements.json", "--requirements", "-r"),
-    answer_key: Path = typer.Option("data/answer_key/insurance_answer_key.json", "--answer-key", "-a"),
-    seeded_bad: Path = typer.Option("data/seeded_bad/insurance_seeded_bad.json", "--seeded-bad", "-b"),
-    domain: str = typer.Option("insurance/life/term", "--domain", "-d"),
+    eval_set: str = typer.Option("all", "--set", "-s", help="Evaluation set: insurance, banking or all. Each has its own data, pack and report."),
+    requirements: Path = typer.Option(None, "--requirements", "-r", help="Custom run: requirements file (give all of -r, -a, -b)"),
+    answer_key: Path = typer.Option(None, "--answer-key", "-a", help="Custom run: known-good cases"),
+    seeded_bad: Path = typer.Option(None, "--seeded-bad", "-b", help="Custom run: labelled flawed cases"),
+    domain: str = typer.Option(None, "--domain", "-d", help="Domain pack for the model context, e.g. banking/retail/checking. Picks the set of its family."),
     threshold: float = typer.Option(0.85, "--threshold", "-t"),
     mode: str = typer.Option("mock", "--mode", "-m", help="Evaluation mode: mock or live"),
     output_dir: Path = typer.Option("runs", "--output-dir", "-o"),
-    resume: Path | None = typer.Option(None, "--resume", help="Path to resume file for checkpointing"),
+    resume: Path | None = typer.Option(None, "--resume", help="Path to resume file for checkpointing (one file per set)"),
 ) -> None:
-    """Run benchmark bake-off over answer_key and seeded_bad test cases."""
-    from .evaluate import format_markdown_report, run_evaluation, save_evaluation
+    """Run the benchmark: known-good cases must be approved, seeded bad cases must not be."""
+    from .evaluate import EVAL_SETS, format_markdown_report, run_evaluation, save_evaluation
+
+    custom = [p for p in (requirements, answer_key, seeded_bad) if p is not None]
+    if custom and len(custom) < 3:
+        typer.secho("A custom run needs all three of --requirements, --answer-key and --seeded-bad.", fg="red", err=True)
+        raise typer.Exit(2)
+    if custom:
+        runs = {"custom": {"requirements": str(requirements), "answer_key": str(answer_key), "seeded_bad": str(seeded_bad),
+                           "domain": domain or "insurance"}}
+    else:
+        if domain and eval_set == "all":
+            eval_set = domain.split("/")[0]
+        names = list(EVAL_SETS) if eval_set == "all" else [eval_set]
+        unknown = [n for n in names if n not in EVAL_SETS]
+        if unknown:
+            typer.secho(f"Unknown evaluation set '{unknown[0]}'. Choose from: {', '.join(EVAL_SETS)}, all.", fg="red", err=True)
+            raise typer.Exit(2)
+        runs = {n: {**EVAL_SETS[n], **({"domain": domain} if domain else {})} for n in names}
+
+    summary, all_met = [], True
     try:
-        typer.secho(f"Running evaluation benchmark (mode: {mode})...", fg="cyan")
-        report = run_evaluation(
-            requirements_path=requirements,
-            answer_key_path=answer_key,
-            seeded_bad_path=seeded_bad,
-            domain=domain,
-            approve_threshold=threshold,
-            agent_mode="mock" if mode == "mock" else "live",
-            resume_path=resume,
-        )
-        json_p, md_p = save_evaluation(report, output_dir=output_dir)
-        typer.echo(format_markdown_report(report))
-        typer.secho(f"Results saved to:\n  {json_p}\n  {md_p}", fg="green")
-        if not report.targets_met:
+        for name, cfg in runs.items():
+            typer.secho(f"\n=== {name} (mode: {mode}, domain pack: {cfg['domain']}) ===", fg="cyan")
+            resume_for_set = resume.with_name(f"{resume.stem}_{name}{resume.suffix}") if resume and len(runs) > 1 else resume
+            report = run_evaluation(
+                requirements_path=cfg["requirements"],
+                answer_key_path=cfg["answer_key"],
+                seeded_bad_path=cfg["seeded_bad"],
+                domain=cfg["domain"],
+                approve_threshold=threshold,
+                agent_mode="mock" if mode == "mock" else "live",
+                resume_path=resume_for_set,
+            )
+            json_p, md_p = save_evaluation(report, output_dir=output_dir, name=name)
+            typer.echo(format_markdown_report(report))
+            typer.secho(f"Results saved to:\n  {json_p}\n  {md_p}", fg="green")
+            summary.append((name, report))
+            all_met = all_met and report.targets_met
+        if len(summary) > 1:
+            typer.secho("\n=== Summary by set ===", fg="cyan")
+            typer.echo(f"{'set':10s} {'caught':>14s} {'good not approved':>20s} {'hard rejects':>14s}  targets")
+            for name, r in summary:
+                typer.echo(f"{name:10s} {r.bad_caught:>3d}/{r.bad_cases:<3d} {r.catch_rate * 100:5.1f}% "
+                           f"{r.good_wrongly_rejected:>4d}/{r.good_cases:<3d} {r.false_reject_rate * 100:5.1f}% "
+                           f"{r.good_hard_rejected:>7d}/{r.good_cases:<3d}  {'PASS' if r.targets_met else 'FAIL'}")
+        if not all_met:
             raise typer.Exit(1)
     except typer.Exit:
         raise

@@ -16,3 +16,7 @@ boundary_hints:
   - Minimum and maximum issue age, and one day either side.
 thresholds:
   similarity: 0.85
+obsolete_terms:
+  2001 cso: Replaced by the 2017 CSO mortality table for policies issued from 1 January 2020.
+  1980 cso: Replaced by the 2017 CSO mortality table for policies issued from 1 January 2020.
+  2001 vbt: Replaced by the 2015 VBT valuation basic table.

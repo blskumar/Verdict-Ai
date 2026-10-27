@@ -19,6 +19,9 @@ dependencies = [
     "python-multipart>=0.0.9",
     "openpyxl>=3.1",
     "python-docx>=1.1",
+    # security floors: older pillow (read by pdfplumber on uploaded PDFs) and certifi have published advisories
+    "pillow>=13.0.0",
+    "certifi>=2026.10.23",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +34,7 @@ verdict-ai = "verdict_ai.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-verdict_ai = ["py.typed", "web/static/*", "*.yaml", "domains/**/*"]
+verdict_ai = ["py.typed", "web/static/*", "web/static/vendor/*", "*.yaml", "domains/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

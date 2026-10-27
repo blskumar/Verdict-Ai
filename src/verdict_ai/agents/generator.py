@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 
+from verdict_ai.agents._common import reply_is_valid
 from verdict_ai.llm import ModelRouter
 from verdict_ai.models import Requirement
 
@@ -29,6 +30,10 @@ For each requirement below, draft test cases covering all recommended scenarios:
 - One Boundary case (threshold limits, boundary edges, zero, or max values)
 - One Security case (unauthorized access, role bypass, tampering, or compliance rule)
 
+If an expected result contains a calculated figure (a premium, fee, rate or percentage), put the rate table
+or worked example it comes from in "source_ref". Never copy a figure from running the system. If the
+requirement gives no table or example, leave source_ref empty rather than inventing one.
+
 Return a JSON array — one object per requirement:
 [
   {{
@@ -37,7 +42,8 @@ Return a JSON array — one object per requirement:
       {{
         "type": "Positive|Negative|Boundary|Security|Calculation",
         "scenario": "<one sentence: given X when Y>",
-        "expected": "<specific, measurable outcome>"
+        "expected": "<specific, measurable outcome>",
+        "source_ref": "<rate table or worked example behind any figure, else empty>"
       }}
     ]
   }}
@@ -83,10 +89,8 @@ def run_generator(
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": _USER_TMPL.format(context=context or "None", items=items)},
         ]
-        try:
-            raw, _model = router.chat(ROLE, messages)
-        except Exception:
-            raw = None
+        # AllModelsExhausted propagates: the caller must know generation failed.
+        raw, _model = router.chat(ROLE, messages, validate=reply_is_valid)
         parsed = _parse(raw, batch)
         output.extend(parsed)
     return output

@@ -1,0 +1,46 @@
+# Template for a new domain pack. Copy it to src/verdict_ai/domains/<family>/<area>/<leaf>.yaml,
+# fill every field with INVENTED, non-confidential text (the context goes to the models on every call),
+# and follow docs/add-a-domain.md. Delete comments you do not need.
+#
+# A pack inherits from the packs above it (the _domain.yaml in each parent folder): contexts are joined parent
+# first, glossary and obsolete_terms merge with the child winning, lists combine, thresholds are overridden.
+
+name: Example Leaf Domain
+description: One sentence on what this domain covers and what it leaves out.
+
+# IDs that belong to this domain, e.g. EX for EX-REQ-01. The domain guard uses them to refuse data from other domains.
+id_prefixes: [EX]
+
+# Two or three sentences the models read: what the product is, its main rules, where the risk is.
+context: >
+  Describe the product in plain words. Name the rules that decide outcomes, the limits that matter and the
+  records that must be kept.
+
+# Terms and their meanings. Used for the models and for the keyword fallback of the domain guard.
+glossary:
+  example term: What it means in this domain.
+
+# Outdated terms or rules. Anything listed here is flagged "possibly outdated" when a requirement or case uses it.
+# Fill with real ones you know; leave empty rather than guessing.
+obsolete_terms: {}
+#  "old fee schedule": "replaced by the 2025 schedule"
+
+# Risk areas. Use two or more words joined by an underscore (late_fee): a one-word tag is treated as a
+# cross-cutting concern and does not produce a "proposed requirement".
+risk_tags: [late_fee, grace_period]
+
+# Limits worth testing. Each should name a boundary: both sides of a limit, whether it is inclusive, a date edge.
+boundary_hints:
+  - A payment one day before and on the due date.
+  - An amount exactly at the limit and one cent above it (is the limit inclusive?).
+
+# Wording to flag as vague or ambiguous in this domain, on top of the built-in lists.
+vague_terms: [reasonable, timely, sufficient]
+ambiguous_phrases: ["subject to approval", "as per policy"]
+
+# Phrases that count as naming a source for a figure (so an expected result with a number is not flagged
+# "uncited_value" when it says where the number comes from).
+source_markers: []
+
+# Optional. Leave out to use gate.yaml. Keys: revise_below, human_review_band, similarity.
+thresholds: {}

@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from .models import Decision, Requirement, TestCase
+from .models import CaseType, Decision, Requirement, TestCase
 
 # shortcut: word overlap only. Paraphrased dupes (SB-019..021) score 0.46-0.68, good-vs-good tops at 0.63,
 # so 0.85 catches none; leave paraphrase detection to the model checks.
@@ -13,12 +13,23 @@ SIMILARITY = 0.85
 
 VAGUE = re.compile(
     r"\b(behaves? correctly|works?( correctly| fine| as expected)?|is fine|are fine|appropriate|as expected|"
-    r"properly|successfully|everything|correct (result|behaviou?r)|results? (is|are) fine)\b", re.I)
+    r"properly|successfully|everything|correct (result|behaviou?r)|results? (is|are) fine|"
+    r"appropriately|(calculated|handled|processed|computed) fine)\b", re.I)
 # "X or Y" between two outcomes: the case does not say which one must happen
 AMBIGUOUS = re.compile(r"\b(blocked|rejected|declined|referred|accepted|approved|sent to \w+)\b[^.]*\bor\b[^.]*"
                        r"\b(blocked|rejected|declined|referred|accepted|approved|sent to \w+|review)\b", re.I)
 # "blocked or referred per configured rule" is fine: the pack config picks the outcome
 CONFIGURED = re.compile(r"\b(per|according to|as configured|configured)\b", re.I)
+# A figure in the expected result must come from somewhere a person can check. These phrases count
+# as naming that place; a domain pack can add its own (source_markers) and a case can fill source_ref.
+SOURCE_MARKERS = re.compile(
+    r"\b(rate (?:table|chart|sheet|file)s?|rating (?:table|manual)s?|fee schedule|price list|"
+    r"worked example|example \d+|table [\w.-]+|section [\d.]+|clause [\d.]+|per spec|per requirement|"
+    r"as per [A-Z]{2,}-)\b|§\s?\d", re.I)
+MONEY = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)")
+PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?%")
+NUMBER = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)(\s?%)?")
+MAX_POOL = 15  # cap on source numbers tried for derivations, so coincidences stay rare
 STOP = {"a", "an", "the", "is", "are", "of", "to", "and", "in", "on", "for", "with", "that", "it"}
 
 
@@ -48,7 +59,86 @@ def _is_compound(c: TestCase) -> bool:
         bool(VAGUE.search(c.expected) or re.search(r"\ball\b", c.expected, re.I))
 
 
-def check_case(c: TestCase, req_ids: set[str]) -> list[Finding]:
+def _num(text: str) -> float:
+    return float(text.replace(",", ""))
+
+
+def _figures(text: str) -> list[float]:
+    """Money and percent amounts a case asserts. A % is kept as written (7% -> 7.0)."""
+    return [_num(m) for m in MONEY.findall(text)] + [_num(m) for m in PERCENT.findall(text)]
+
+
+def _pool(*texts: str) -> list[float]:
+    """Every number in the given texts. A percent also contributes its fraction (7% -> 7 and 0.07)."""
+    out: list[float] = []
+    for t in texts:
+        for value, pct in NUMBER.findall(t):
+            n = _num(value)
+            for v in (n, n / 100 if pct else None):
+                if v is not None and v not in out:
+                    out.append(v)
+    return out
+
+
+def _close(a: float, b: float) -> bool:
+    return abs(a - b) <= max(0.005, abs(b) * 1e-9)
+
+
+def _grounded(value: float, pool: list[float]) -> bool:
+    """True if value is in the pool, or is the sum, difference, product or ratio of two pool numbers."""
+    pool = pool[:MAX_POOL]
+    if any(_close(value, p) for p in pool):
+        return True
+    for i, a in enumerate(pool):
+        for b in pool[i + 1:]:
+            if any(_close(value, v) for v in (a + b, abs(a - b), a * b, a / b if b else None, b / a if a else None)
+                   if v is not None):
+                return True
+    return False
+
+
+def check_value_source(c: TestCase, req: Requirement | None = None, markers: list[str] = ()) -> list[Finding]:
+    """The expected result states a figure that appears nowhere a tester can check, and the case cites no source.
+
+    A figure is fine if it is in the scenario, in the requirement text or acceptance criteria, or is a sum,
+    difference, product or ratio of two numbers found there. Otherwise the case must name where it came
+    from: fill source_ref, or write it in the scenario or expected result ("per rate table RT-2026-03").
+    This is a presence check only. It cannot tell whether the cited table says what the case claims.
+    """
+    figures = _figures(c.expected)
+    if not figures and c.type is CaseType.calculation:
+        figures = [_num(m) for m, _ in NUMBER.findall(c.expected)]
+    if not figures:
+        return []
+    if c.source_ref.strip():
+        return []
+    custom = re.compile("|".join(re.escape(m) for m in markers), re.I) if markers else None
+    text = f"{c.scenario} {c.expected}"
+    if SOURCE_MARKERS.search(text) or (custom and custom.search(text)):
+        return []
+    pool = _pool(c.scenario, req.text if req else "", req.acceptance_criteria if req else "")
+    loose = [v for v in figures if not _grounded(v, pool)]
+    if not loose:
+        return []
+    shown = ", ".join(f"{v:g}" for v in loose[:3])
+    return [Finding(c.id, "uncited_value", "revise",
+                    f"Expected result states {shown}, but the case does not say where it comes from. "
+                    "Cite the rate table or worked example (source_ref, or write it in the case).",
+                    c.requirement_id)]
+
+
+def _pack_hit(terms: list[str], text: str, word: bool = False) -> str | None:
+    """First pack term found in the text (whole word when word=True), else None."""
+    low = text.lower()
+    for t in terms:
+        if (re.search(rf"\b{re.escape(t.lower())}\b", low) if word else t.lower() in low):
+            return t
+    return None
+
+
+def check_case(c: TestCase, req_ids: set[str], req: Requirement | None = None,
+               markers: list[str] = (), vague: list[str] = (), ambiguous: list[str] = ()) -> list[Finding]:
+    """vague / ambiguous: the domain pack's own vague_terms and ambiguous_phrases, on top of the built-in lists."""
     out: list[Finding] = []
     rid = c.requirement_id
 
@@ -59,12 +149,17 @@ def check_case(c: TestCase, req_ids: set[str]) -> list[Finding]:
         add("untraceable", "reject", f"Requirement {rid} does not exist, so the case traces to nothing.")
     if not c.expected.strip():
         add("missing_expected", "revise", "No expected result. A tester cannot pass or fail this case.")
-    elif VAGUE.search(c.expected):
+    # "successfully created ... balance of $25.00" is specific: a vague word next to a concrete figure is fine.
+    elif (VAGUE.search(c.expected) or _pack_hit(vague, c.expected, word=True)) and not re.search(r"\d", c.expected):
         add("vague_expected", "revise", f"Expected result is vague: '{c.expected.strip()}'. State the exact outcome.")
+    elif _pack_hit(ambiguous, c.expected) and not CONFIGURED.search(c.expected):
+        add("ambiguous_outcome", "human_review",
+            f"Expected result uses a phrase this domain treats as ambiguous: '{_pack_hit(ambiguous, c.expected)}'.")
     elif AMBIGUOUS.search(c.expected) and not CONFIGURED.search(c.expected):
         add("ambiguous_outcome", "human_review", "Expected result allows two outcomes. A person must decide which one is right.")
     if _is_compound(c):
         add("compound_case", "revise", "Case bundles several actions. Split it into one case per action.")
+    out += check_value_source(c, req, markers)
     return out
 
 
@@ -95,7 +190,12 @@ def check_coverage(reqs: list[Requirement], cases: list[TestCase]) -> list[Findi
     return out
 
 
-def run_rules(reqs: list[Requirement], cases: list[TestCase], reference: list[TestCase] = ()) -> list[Finding]:
+def run_rules(reqs: list[Requirement], cases: list[TestCase], reference: list[TestCase] = (),
+              pack=None) -> list[Finding]:
     ids = {r.id for r in reqs}
-    found = [f for c in cases for f in check_case(c, ids)]
+    by_id = {r.id: r for r in reqs}
+    markers = list(getattr(pack, "source_markers", None) or [])
+    vague = list(getattr(pack, "vague_terms", None) or [])
+    ambiguous = list(getattr(pack, "ambiguous_phrases", None) or [])
+    found = [f for c in cases for f in check_case(c, ids, by_id.get(c.requirement_id), markers, vague, ambiguous)]
     return found + check_duplicates(cases, reference) + check_coverage(reqs, cases)

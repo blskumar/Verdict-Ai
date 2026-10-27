@@ -32,6 +32,9 @@ class TestCase(BaseModel):
     type: CaseType | None = None
     scenario: str
     expected: str
+    # Where the expected value comes from: a rate table, worked example, spec section.
+    # Optional; a citation written inside scenario or expected counts too (see rules.check_value_source).
+    source_ref: str = ""
     source: Literal["answer_key", "generated", "seeded_bad", "uploaded"] = "uploaded"
 
 

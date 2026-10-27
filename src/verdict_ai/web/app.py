@@ -12,13 +12,14 @@ import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from verdict_ai import domains as dom
+from verdict_ai.domain_review import review as domain_review
 from verdict_ai.agents.generator import run_generator
 from verdict_ai.gate import GateEngine
 from verdict_ai.llm import ModelRouter
@@ -64,6 +65,7 @@ class RecognizeRequest(BaseModel):
 class AnalyzeRequirementsRequest(BaseModel):
     requirements: list[dict[str, Any]] = Field(default_factory=list)
     raw_text: str | None = None
+    cases: list[dict[str, Any]] = Field(default_factory=list)  # optional: lets the domain review judge case coverage
     domain: str | None = None
     agent_mode: Literal["mock", "live"] = "mock"
 
@@ -73,6 +75,12 @@ class ExportRequirementsReviewRequest(BaseModel):
     analyses: list[dict[str, Any]] = Field(default_factory=list)
     domain: str | None = None
     agent_mode: Literal["mock", "live"] = "mock"
+
+
+class DomainCheckRequest(BaseModel):
+    domain: str | None = None
+    requirements: list[dict[str, Any]] = Field(default_factory=list)
+    cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class GenerateCasesRequest(BaseModel):
@@ -182,7 +190,7 @@ def _build_mock_router_for_evaluation(cases: list[TestCase], reqs: list[Requirem
             self._request_count = 0
             self._bad_json_streak = {}
 
-        def chat(self, role: str, messages: list[dict], *, context: str = ""):  # noqa: ARG002
+        def chat(self, role: str, messages: list[dict], *, context: str = "", validate=None):  # noqa: ARG002
             user_msg = messages[1]["content"] if len(messages) > 1 else ""
             batch_req_ids = set(re.findall(r"req_id:\s*([^\s\n]+)", user_msg))
             batch_case_ids = set(re.findall(r"case_id:\s*([^\s\n]+)", user_msg))
@@ -299,6 +307,45 @@ def _build_decision_analysis(
 # App Factory
 # ---------------------------------------------------------------------------
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
+# shortcut: the page still has inline scripts and handlers (and Tailwind's runtime builds styles), so script-src
+# needs 'unsafe-inline'. All script files come from this app. Tighten after moving the inline code out.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
+    "img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+
+
+RESUME_DIR = Path("runs") / "resume"
+
+
+def _resume_file(name: str | None) -> Path | None:
+    """The client may name a resume file, never a path: it must be a plain file name, kept under runs/resume/."""
+    if not name:
+        return None
+    if name != Path(name).name or name in (".", "..") or not re.fullmatch(r"[A-Za-z0-9._-]{1,80}\.json", name):
+        raise HTTPException(status_code=400, detail="resume_path must be a plain file name such as 'run1.json'. Paths are not allowed.")
+    RESUME_DIR.mkdir(parents=True, exist_ok=True)
+    return RESUME_DIR / name
+
+
+def _guard_domain(domain: str | None, reqs: list[dict[str, Any]], cases: list[dict[str, Any]]) -> None:
+    """Stop with a clear message when the data belongs to another domain than the one selected."""
+    try:
+        message = dom.domain_mismatch(domain, reqs, cases)
+    except dom.DomainError:
+        return  # an unknown domain path is reported by the caller's own pack loading
+    if message:
+        raise HTTPException(status_code=422, detail=message)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Verdict AI API & WebUI",
@@ -313,6 +360,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        if not request.url.path.startswith(("/docs", "/redoc")):  # Swagger UI needs its own CDN and inline script
+            response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        return response
 
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -351,10 +407,11 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(exc))
 
     @app.get("/api/sample")
-    def get_sample_data() -> dict[str, Any]:
-        """Return sample requirements and test cases for quick evaluation in the UI."""
-        req_path = Path("data/requirements/insurance_requirements.json")
-        case_path = Path("data/answer_key/insurance_answer_key.json")
+    def get_sample_data(domain: str = "") -> dict[str, Any]:
+        """Return sample requirements and test cases for the chosen domain (default: insurance)."""
+        family = "banking" if domain == "banking" or domain.startswith("banking/") else "insurance"
+        req_path = Path(f"data/requirements/{family}_requirements.json")
+        case_path = Path(f"data/answer_key/{family}_answer_key.json")
 
         sample_reqs: list[dict[str, Any]] = []
         sample_cases: list[dict[str, Any]] = []
@@ -362,7 +419,14 @@ def create_app() -> FastAPI:
         if req_path.exists():
             try:
                 data = json.loads(req_path.read_text(encoding="utf-8"))
-                sample_reqs = data[:4]  # First 4 requirements
+                if isinstance(data, dict):
+                    data = data.get("requirements", [])
+                # Requirements in the chosen domain, its sub-domains, or a parent domain (inherited).
+                def _in_scope(r: dict[str, Any]) -> bool:
+                    rd = r.get("domain") or ""
+                    return not domain or rd == domain or rd.startswith(domain + "/") or domain.startswith(rd + "/")
+                matching = [r for r in data if _in_scope(r)]
+                sample_reqs = (matching or data)[:4]  # First 4 requirements
             except Exception:
                 pass
 
@@ -419,7 +483,7 @@ def create_app() -> FastAPI:
             ]
 
         return {
-            "domain": "insurance/life/term",
+            "domain": domain or ("banking/retail/checking" if family == "banking" else "insurance/p-and-c/homeowners"),
             "requirements": sample_reqs,
             "cases": sample_cases,
         }
@@ -430,6 +494,7 @@ def create_app() -> FastAPI:
         cases_file: UploadFile | None = File(None),
         file: UploadFile | None = File(None),
         files: list[UploadFile] | None = File(None),
+        domain: str | None = Form(None),
     ) -> dict[str, Any]:
         """Parse uploaded requirements and/or cases from PDF, DOCX, XLSX, JSON, or CSV."""
         parsed_reqs: list[dict[str, Any]] = []
@@ -511,6 +576,7 @@ def create_app() -> FastAPI:
                 for f_item in files:
                     await _process_upload(f_item, None)
 
+        _guard_domain(domain, parsed_reqs, parsed_cases)
         return {
             "requirements": parsed_reqs,
             "cases": parsed_cases,
@@ -541,11 +607,14 @@ def create_app() -> FastAPI:
         if not req_models:
             raise HTTPException(status_code=400, detail="No requirements provided for analysis.")
 
+        req_dicts = [r.model_dump() for r in req_models]
+        _guard_domain(req.domain, req_dicts, req.cases)
         domain_context = ""
+        pack = None
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
@@ -554,7 +623,7 @@ def create_app() -> FastAPI:
         else:
             router = ModelRouter()
 
-        analyses = analyze_requirements(req_models, router=router, context=domain_context)
+        analyses = analyze_requirements(req_models, router=router, context=domain_context, pack=pack)
 
         total = len(analyses)
         testable_count = sum(1 for a in analyses if a.testability_verdict == "testable")
@@ -574,7 +643,17 @@ def create_app() -> FastAPI:
                 "high_risk": high_risk_count,
             },
             "requirements": [r.model_dump() for r in req_models],
+            "domain_review": domain_review(req_dicts, req.cases, pack) if pack else None,
         }
+
+    @app.post("/api/domain/check")
+    def check_domain(req: DomainCheckRequest) -> dict[str, Any]:
+        """Tell the page right away whether the loaded data fits the selected domain."""
+        try:
+            message = dom.domain_mismatch(req.domain, req.requirements, req.cases)
+        except dom.DomainError as exc:
+            message = str(exc)
+        return {"ok": message is None, "message": message}
 
     @app.post("/api/requirements/generate-cases")
     def generate_cases_endpoint(req: GenerateCasesRequest) -> dict[str, Any]:
@@ -583,12 +662,13 @@ def create_app() -> FastAPI:
 
         if not req_models:
             raise HTTPException(status_code=400, detail="No requirements provided for test case generation.")
+        _guard_domain(req.domain, req.requirements, [])
 
         domain_context = ""
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
@@ -646,6 +726,7 @@ def create_app() -> FastAPI:
                     "type": case_type,
                     "scenario": c.get("scenario", f"Verify requirement {r.id} behavior."),
                     "expected": c.get("expected", "System behaves strictly according to specification."),
+                    "source_ref": str(c.get("source_ref") or ""),
                     "source": source,
                 })
 
@@ -663,6 +744,7 @@ def create_app() -> FastAPI:
         """Run gate evaluation on submitted requirements and test cases."""
         if not req.cases:
             raise HTTPException(status_code=400, detail="No test cases provided for evaluation.")
+        _guard_domain(req.domain, req.requirements, req.cases)
 
         # Convert dicts to Pydantic models
         try:
@@ -689,6 +771,7 @@ def create_app() -> FastAPI:
                     type=case_type_enum,
                     scenario=c.get("scenario", ""),
                     expected=c.get("expected", ""),
+                    source_ref=str(c.get("source_ref") or ""),
                     source=src_val,
                 ))
             except Exception as exc:
@@ -700,20 +783,20 @@ def create_app() -> FastAPI:
         if req.domain:
             try:
                 pack = dom.load_pack(req.domain)
-                domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                domain_context = dom.context_text(pack)
             except Exception:
                 pass
 
         # 1. Rule Checks
         findings: list[Finding] = []
         if req.use_rules:
-            findings = run_rules(req_models, case_models)
+            findings = run_rules(req_models, case_models, pack=pack)
 
         # 2. Agent / LLM Checks with safe failover
         checks: list[CheckResult] = []
         if req.use_agents:
             run_res = None
-            r_path = Path(req.resume_path) if req.resume_path else None
+            r_path = _resume_file(req.resume_path)
             cfg = OrchestratorConfig(run_analyst=True, run_arbiter=True, resume_path=r_path)
             if req.agent_mode == "mock":
                 router = _build_mock_router_for_evaluation(case_models, req_models)
@@ -847,10 +930,13 @@ def create_app() -> FastAPI:
         """Export evaluation results to downloadable file."""
         gate_models: list[GateResult] = []
         for idx, r in enumerate(req.results, start=1):
-            cid = str(r.get("case_id") or f"TC-EXPORT-{idx:03d}")
+            cid = r.get("case_id")
             dec = r.get("decision")
+            # Never invent an id or quietly turn an unknown decision into another one: reject the request.
+            if not isinstance(cid, str) or not cid.strip():
+                raise HTTPException(status_code=422, detail=f"Result {idx} has no case_id.")
             if dec not in ("approve", "revise", "reject", "human_review"):
-                dec = "human_review"
+                raise HTTPException(status_code=422, detail=f"Result {idx} ({cid}) has an unknown decision: {dec!r}.")
             gate_models.append(GateResult(
                 case_id=cid,
                 decision=dec,
@@ -902,14 +988,14 @@ def create_app() -> FastAPI:
         else:
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["id", "requirement_id", "type", "scenario", "expected", "source"])
+            w.writerow(["id", "requirement_id", "type", "scenario", "expected", "source", "source_ref"])
             first_group = True
             for rid, grp in groups.items():
                 if not first_group:
                     # Provide empty break row between requirement groups
                     w.writerow([])
                 clean_rid = _csv_clean(rid)
-                w.writerow([f"REQUIREMENT: {clean_rid} ({len(grp)} test cases)", "", "", "", "", ""])
+                w.writerow([f"REQUIREMENT: {clean_rid} ({len(grp)} test cases)", "", "", "", "", "", ""])
                 first_group = False
                 for c in grp:
                     w.writerow([
@@ -919,6 +1005,7 @@ def create_app() -> FastAPI:
                         _csv_clean(c.get("scenario", "")),
                         _csv_clean(c.get("expected", "")),
                         _csv_clean(c.get("source", "uploaded")),
+                        _csv_clean(c.get("source_ref", "")),
                     ])
             body = buf.getvalue()
             content_type = "text/csv"
@@ -967,7 +1054,7 @@ def create_app() -> FastAPI:
             if req.domain:
                 try:
                     pack = dom.load_pack(req.domain)
-                    domain_context = f"Domain: {pack.name}\nRules: {', '.join(pack.rules)}"
+                    domain_context = dom.context_text(pack)
                 except Exception:
                     pass
             if req.agent_mode == "mock":

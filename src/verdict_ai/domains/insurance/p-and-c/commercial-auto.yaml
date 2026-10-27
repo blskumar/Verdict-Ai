@@ -15,3 +15,6 @@ boundary_hints:
   - VIN of 16 and 18 characters.
   - Fleet size exactly at, and one above, the auto-quote threshold.
   - Vehicle added on the first and last day of the term.
+obsolete_terms:
+  aobrd: Automatic on-board recording devices were phased out on 16 December 2019. Electronic logging devices (ELD) are required.
+  paper log: Paper hours-of-service logs are replaced by ELDs except for narrow exemptions. Confirm the exemption.

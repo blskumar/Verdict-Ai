@@ -11,3 +11,5 @@ boundary_hints:
   - Opening balance exactly equal to minimum deposit vs one cent below.
   - Overdraft transaction when opt-in is disabled vs enabled.
   - Fee waiver trigger on exactly 500 dollars direct deposit vs 499.99 dollars.
+obsolete_terms:
+  $5 overdraft fee: The CFPB $5 overdraft benchmark rule (December 2024) was repealed under the Congressional Review Act in 2025. Do not treat it as in force; use the bank's configured fee.
