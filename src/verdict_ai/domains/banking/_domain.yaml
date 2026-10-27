@@ -23,3 +23,20 @@ thresholds:
   human_review_band: [0.70, 0.85]
   similarity: 0.85
 id_prefixes: [BANK]
+obsolete_terms:
+  libor: USD LIBOR ceased on 30 June 2023. Use SOFR (US), SONIA (UK) or EURIBOR/the euro short-term rate, with the contract's spread.
+  $100,000 fdic: FDIC and NCUA standard coverage has been $250,000 per depositor, per bank, per ownership category since 2010.
+  fdic limit of $100,000: FDIC and NCUA standard coverage has been $250,000 per depositor, per bank, per ownership category since 2010.
+  mt103: SWIFT MT cross-border payment messages gave way to ISO 20022 (pacs.008) after coexistence ended in November 2025. Fedwire moved to ISO 20022 in July 2025.
+  3-d secure 1.0: 3-D Secure 1.0 was retired by the card networks in 2022. Use 3-D Secure 2.x.
+  3ds 1.0: 3-D Secure 1.0 was retired by the card networks in 2022. Use 3-D Secure 2.x.
+  pci dss 3.2.1: Retired on 31 March 2024. Use PCI DSS 4.0.1.
+  pci dss v3: PCI DSS version 3.x is retired. Use PCI DSS 4.0.1.
+  sms otp: SMS one-time codes as the only second factor are discouraged (NIST SP 800-63, FFIEC). Prefer app-based, hardware or passkey authentication; confirm the rule.
+  tls 1.0: Deprecated by RFC 8996 (2021). Require TLS 1.2 or 1.3.
+  tls 1.1: Deprecated by RFC 8996 (2021). Require TLS 1.2 or 1.3.
+  sha-1: Deprecated for signatures and certificates. Use SHA-256 or stronger.
+  3des: Triple DES is disallowed by NIST from 2024. Use AES.
+  triple des: Triple DES is disallowed by NIST from 2024. Use AES.
+  internet explorer: Retired by Microsoft in June 2022. Test on Edge, Chrome, Firefox and Safari.
+  adobe flash: End of life since 31 December 2020.

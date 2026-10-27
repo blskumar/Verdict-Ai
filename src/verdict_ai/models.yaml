@@ -1,29 +1,37 @@
+# Ordered model list per role. The router tries them top to bottom and moves to the next on:
+# HTTP 429 (rate limit), 402 (no credits), 5xx, timeout, model unavailable, or two bad JSON replies in a row.
+# A failed model is skipped for cooldown_seconds. Last entries without ":free" are cheap paid models: a last
+# resort so a run does not stop when the free endpoints are busy. Delete them to stay free-only.
+#
+# Model ids change often. Check them any time with:  python scripts/check_models.py
+# Keep the generator and the judging roles on different model families where possible.
+# To override without editing the package, copy this file to models.yaml in the project folder.
 request_cap: 200          # max total requests this run
-cooldown_seconds: 60       # how long a failed model is skipped (seconds)
+cooldown_seconds: 60      # how long a failed model is skipped (seconds)
 
 roles:
-  analyst:
+  analyst:                # flags vague or untestable requirements
     models:
-      - minimax/minimax-m3.1-flash:free
       - nvidia/nemotron-3.5-lightning:free
+      - google/gemma-4-26b-a4b-it:free
+      - qwen/qwen3.7-flash                    # paid, about $0.03 in / $0.13 out per 1M tokens
+  generator:              # drafts test cases
+    models:
       - google/gemma-4-31b-it:free
-  generator:
-    models:
-      - minimax/minimax-m3.1-flash:free
-      - google/gemma-4-31b-it:free
       - nvidia/nemotron-3.5-lightning:free
-  reviewer:
+      - mistralai/mistral-nemo                # paid, about $0.03 / $0.03 per 1M tokens
+  reviewer:               # coverage and correctness of each case
     models:
-      - minimax/minimax-m3.1-flash:free
-      - nvidia/nemotron-3.5-lightning:free
-      - google/gemma-4-31b-it:free
-  checker:
+      - nvidia/nemotron-3-ultra-550b-a55b:free
+      - poolside/laguna-s-2.1:free
+      - openai/gpt-oss-120b                   # paid
+  checker:                # invented values, traceability
     models:
-      - minimax/minimax-m3.1-flash:free
+      - poolside/laguna-s-2.1:free
       - nvidia/nemotron-3.5-lightning:free
-      - google/gemma-4-31b-it:free
-  arbiter:
+      - openai/gpt-oss-20b                    # paid, about $0.02 / $0.09 per 1M tokens
+  arbiter:                # only when reviewer and checker disagree
     models:
-      - minimax/minimax-m3.1-flash:free
-      - nvidia/nemotron-3.5-lightning:free
-
+      - nvidia/nemotron-3-ultra-550b-a55b:free
+      - poolside/laguna-s-2.1:free
+      - openai/gpt-oss-120b                   # paid

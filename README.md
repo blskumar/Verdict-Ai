@@ -6,7 +6,7 @@
 
 Verdict AI reads requirements and candidate test cases, rates each case, and returns one of four verdicts with a reason: **Approve**, **Revise**, **Reject** or **Human Review**. The models reason; plain code makes every decision.
 
-> **Status (26 Oct 2026).** Plain-code rule checks are done and measured. The 80% defect-catch target has **not** been reached or measured with real models yet: offline, the rules alone catch 14 of 33 seeded bad cases (42.4%) and wrongly reject 0 of 75 good ones. The remaining defect types need live models. See [What is measured](#what-is-measured).
+> **Status (27 Oct 2026).** Plain-code rule checks are done and measured. Each domain family has its own evaluator (insurance, banking). Offline, the rules alone catch 14 of 33 seeded bad cases in each (42.4%) and hard-reject none of the good ones. In the latest live run all three targets are met in both families: insurance caught 30/33 and did not approve 7/75 good cases; banking caught 30/33 and did not approve 1/17. See [What is measured](#what-is-measured).
 
 ---
 
@@ -66,17 +66,21 @@ Open **http://127.0.0.1:8000**, pick a domain, click **Load Sample Data**, then 
 Put `OPENROUTER_API_KEY=...` in a local `.env` file (it is git-ignored; never commit or paste it). Free endpoints may log prompts, so use invented data only.
 
 ### Run the benchmark
+Each domain family has its own evaluator: its own requirements, known-good cases, labelled bad cases and domain pack. The engine is shared.
 ```bash
-verdict-ai evaluate --mode mock    # offline: rules only, models are stubs
-verdict-ai evaluate --mode live    # real models from models.yaml
+verdict-ai evaluate                      # every family, offline (rules only, models are stubs)
+verdict-ai evaluate --set banking        # one family
+verdict-ai evaluate --domain banking/retail/checking   # picks the banking set, with that pack as context
+verdict-ai evaluate --mode live          # real models from models.yaml
 ```
-The command exits with code 1 when a target is missed. Mock output today:
+Each report has a table of results per sub-domain, and the command ends with a summary by family. It exits with code 1 when a target is missed. Mock summary today:
 
 ```
-Catch Rate (Defects)   42.4% (14/33)   target >= 80%   FAIL
-False Reject Rate       0.0% (0/75)    target < 15%    PASS
-Reason Compliance     100.0%           target 100%     PASS
+set         caught        good not approved   hard rejects   targets
+insurance   14/33  42.4%    0/75   0.0%         0/75       FAIL
+banking     14/33  42.4%    1/17   5.9%         0/17       FAIL
 ```
+To add a family or a sub-domain, follow [docs/add-a-domain.md](docs/add-a-domain.md).
 
 ---
 
@@ -84,9 +88,9 @@ Reason Compliance     100.0%           target 100%     PASS
 
 | Claim | Status |
 |---|---|
-| Wrongly rejects under 15% of good cases | Met: 0 of 75, by rules alone and across generated data for all 8 sub-domains. |
+| Wrongly rejects under 15% of good cases | Met by rules alone: 0 hard rejects (insurance 0/75, banking 0/17). Live: 0 hard rejects; good cases not approved 7/75 (9.3%) in insurance and 1/17 (5.9%) in banking. **Met.** |
 | A reason on every decision | Met, including approvals. |
-| Catches at least 80% of seeded bad cases | **Not met offline (42.4%).** Caught by rules: vague, missing or ambiguous expected result, compound case, untraceable, wrong arithmetic. Not caught without models: contradicts requirement, hallucinated feature, wrong boundary outcome, invented value, near-duplicate, out of scope. The live-model run has not been done. |
+| Catches at least 80% of seeded bad cases | **Met with live models: 90.9% (30/33) in each family.** Offline, rules alone catch 42.4%. Every defect type is caught except `near_duplicate` (0/3 in each family), which needs a similarity check. Models used: nemotron-3-ultra, nemotron-3.5-lightning, laguna-s-2.1 (free tier). Banking has only 17 good cases, so its false-flag rate is a small sample. |
 
 The offline benchmark used to read the seeded defect labels and reported 33 of 33. That was circular and has been removed.
 
@@ -127,13 +131,14 @@ python scripts/perf_and_security_probe.py    # latency, load, headers, dependenc
 | `verdict-ai domains list` | Show the domain tree | `verdict-ai domains list` |
 | `verdict-ai domains show` | Show a merged pack | `verdict-ai domains show banking/retail/checking` |
 | `verdict-ai web` | Start the web page | `verdict-ai web --port 8000` |
-| `verdict-ai evaluate` | Benchmark on `data/answer_key` and `data/seeded_bad` | `verdict-ai evaluate --mode mock` |
+| `verdict-ai evaluate` | Benchmark per family: known-good and seeded bad cases | `verdict-ai evaluate --set banking --mode live` |
 
 ---
 
 ## Documentation
 
 - [User guide](docs/user-guide.md)
+- [Add a domain: checklist](docs/add-a-domain.md) and [pack template](docs/domain-pack-template.yaml)
 - [Project notes and decisions](CLAUDE.md), [plan](PLAN.md)
 - Swagger API while the server runs: http://127.0.0.1:8000/docs
 

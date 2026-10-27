@@ -20,6 +20,11 @@ VERDICT_CONFLICT = True  # reviewer.passed != checker.passed always triggers arb
 _SYSTEM = (
     "You are an impartial QA arbiter. "
     "Two reviewers disagree on a test case. Study both opinions and give a final verdict. "
+    "Judge each case on its own. A case may test one rule, one boundary or one combination of its requirement; "
+    "do not mark it down for leaving the rest of the requirement untested. "
+    "Routine detail that follows from the requirement (the next workflow step, a reference number, a status) is acceptable. "
+    "Mark a case down only when it contradicts the requirement, states a figure or rule that cannot be inferred from it or from "
+    "the domain context, tests a different requirement, or repeats another case. "
     "Return ONLY valid JSON — no markdown fences, no commentary."
 )
 

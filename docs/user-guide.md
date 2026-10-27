@@ -49,9 +49,9 @@ The command is `verdict-ai`.
 | `verdict-ai domains list` | Show the domain tree. |
 | `verdict-ai domains show <path>` | Show the merged pack, for example `banking/retail/checking`. |
 | `verdict-ai web [--port 8000]` | Start the web page. Run it from the project folder. |
-| `verdict-ai evaluate --mode mock\|live` | Benchmark on `data/answer_key` (75 good cases) and `data/seeded_bad` (33 flawed cases). Exits with code 1 when a target is missed. |
+| `verdict-ai evaluate [--set insurance\|banking\|all] [--domain <path>] [--mode mock\|live]` | One evaluator per domain family. Each has its own requirements, known-good cases and 33 labelled flawed cases (insurance: 25 requirements and 75 good cases; banking: 10 and 17). Prints per-sub-domain results and a summary by family; reports are saved as `eval_<set>_<time>.md/.json`. Exits with code 1 when a target is missed. |
 
-`--mode mock` is offline and uses stand-in models that approve everything, so it shows what the plain-code rules alone achieve. `--mode live` uses the models in `models.yaml`.
+`--mode mock` is offline and uses stand-in models that approve everything, so it shows what the plain-code rules alone achieve. `--mode live` uses the models in `models.yaml` (check them with `python scripts/check_models.py`). Give `--domain banking/retail/checking` to pick the banking set and use that pack as model context. A custom run needs all of `-r`, `-a` and `-b`. To add a domain, follow `docs/add-a-domain.md`.
 
 ---
 
@@ -110,7 +110,7 @@ A child pack adds to its parents: contexts are joined parent first, the glossary
 |---|---|
 | `name`, `description`, `context` | What the domain is. Sent to the models. |
 | `glossary` | Terms and meanings. |
-| `obsolete_terms` | `outdated term: why or what replaced it`. Flagged when used. **Empty in every pack today: add yours.** |
+| `obsolete_terms` | `outdated term: why or what replaced it`. Flagged when used. Packs ship with starter terms for retired or replaced standards (for example LIBOR, TLS 1.0, PCI DSS 3.2.1, 2001 CSO, AOBRD). Review them and add yours. Matching is a lowercase substring, so use specific phrases. |
 | `risk_tags` | Risk areas. Multi-word tags (`overdraft_fee`) drive proposed requirements. |
 | `boundary_hints` | Limits worth testing. Drive "scenarios still needed". |
 | `vague_terms`, `ambiguous_phrases` | Wording to flag. |
@@ -118,7 +118,7 @@ A child pack adds to its parents: contexts are joined parent first, the glossary
 | `source_markers` | Extra phrases that count as naming a source for a figure. |
 | `thresholds` | `revise_below`, `human_review_band`, `similarity`. |
 
-Add a domain by adding a folder and a YAML file. Use invented data only.
+Add a domain by adding a folder and a YAML file, then an evaluation set: see `docs/add-a-domain.md` (checklist) and `docs/domain-pack-template.yaml` (template). Use invented data only.
 
 ---
 
@@ -155,7 +155,7 @@ thresholds:
 Keep the revise cutoff at or below 0.72, or unjudged cases stop reaching human review. Every decision has a reason, including approvals.
 
 ### What is measured today
-Offline, the rules alone catch 14 of 33 seeded bad cases (42.4%) and wrongly reject 0 of 75 good ones. The 80% target needs live models and has not been measured.
+Offline, the rules alone catch 14 of 33 seeded bad cases (42.4%) in each family and hard-reject none of the good ones. Live run of 27 Oct 2026 (free-tier models): insurance caught 30/33 and did not approve 7/75 good cases; banking caught 30/33 and did not approve 1/17; no good case was hard-rejected. All three targets are met. The one defect type still missed is `near_duplicate` (0/3 in each family).
 
 ---
 
@@ -202,9 +202,9 @@ python scripts/perf_and_security_probe.py    # latency, load, headers, dependenc
 
 ## 10. Known limits
 
-- The 80% catch target is not met or measured. Not caught without models: contradicts requirement, hallucinated feature, wrong boundary outcome, invented value, near-duplicate, out of scope.
+- Near-duplicate cases are not caught (0/3 in each family). Offline, without models, the rules alone catch 42.4% of the seeded bad cases. Banking has only 17 good cases, so its false-flag rate is a small sample.
 - Domain review and the guard use keywords. They can miss things and can suggest things that are not needed.
-- No outdated terms are listed in the packs yet.
+- The starter outdated terms are a general list from public standards, not your company's; review and extend them.
 - Content from a domain with no pack is accepted under any selected domain.
 - One request is handled at a time; very large runs (20,000 cases) take about two minutes.
 - Tested on emulated devices, not physical phones or a real Safari.

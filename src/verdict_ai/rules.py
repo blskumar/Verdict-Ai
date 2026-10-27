@@ -13,7 +13,8 @@ SIMILARITY = 0.85
 
 VAGUE = re.compile(
     r"\b(behaves? correctly|works?( correctly| fine| as expected)?|is fine|are fine|appropriate|as expected|"
-    r"properly|successfully|everything|correct (result|behaviou?r)|results? (is|are) fine)\b", re.I)
+    r"properly|successfully|everything|correct (result|behaviou?r)|results? (is|are) fine|"
+    r"appropriately|(calculated|handled|processed|computed) fine)\b", re.I)
 # "X or Y" between two outcomes: the case does not say which one must happen
 AMBIGUOUS = re.compile(r"\b(blocked|rejected|declined|referred|accepted|approved|sent to \w+)\b[^.]*\bor\b[^.]*"
                        r"\b(blocked|rejected|declined|referred|accepted|approved|sent to \w+|review)\b", re.I)

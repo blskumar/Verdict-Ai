@@ -124,6 +124,7 @@ class Orchestrator:
 
         for i in range(0, len(cases_to_review), bs):
             batch = cases_to_review[i : i + bs]
+            _progress(f"reviewer: batch {i // bs + 1} of {-(-len(cases_to_review) // bs)} ({len(batch)} cases) ...")
             if result.auth_error:
                 exhausted_ids.extend(c.id for c in batch)
                 continue
@@ -152,6 +153,7 @@ class Orchestrator:
 
         for i in range(0, len(cases_to_check), bs):
             batch = cases_to_check[i : i + bs]
+            _progress(f"checker: batch {i // bs + 1} of {-(-len(cases_to_check) // bs)} ({len(batch)} cases) ...")
             if result.auth_error:
                 for c in batch:
                     if c.id not in result.exhausted_case_ids:

@@ -10,3 +10,7 @@ risk_tags: [interest_accrual, apy_tiers, withdrawal_limit]
 boundary_hints:
   - Balance reaching the boundary between APY tiers (e.g., 10,000 dollars threshold).
   - Monthly withdrawal count on threshold limits.
+obsolete_terms:
+  six withdrawals per month: The Federal Reserve removed the Regulation D six-transfer limit in April 2020. A bank may still set its own limit; require the configured value.
+  6 withdrawals per month: The Federal Reserve removed the Regulation D six-transfer limit in April 2020. A bank may still set its own limit; require the configured value.
+  passbook: Legacy paper product. Test against the current digital account and statement.

@@ -1108,3 +1108,51 @@ def test_toolbars_wrap_and_controls_are_at_least_24px(client):
     assert "px-1.5 py-0.5 text-[10px] font-semibold rounded bg-background" not in page, "old 19px-high buttons are back"
     assert "w-full h-2 bg-muted" not in page, "8px-high slider is back"
     assert page.count("min-h-[24px]") >= 8
+
+
+# ============================================================ 17. one evaluator per domain family
+
+def test_cli_evaluate_runs_every_family_and_prints_a_summary(tmp_path):
+    p = _run_cli(["evaluate", "--output-dir", str(tmp_path)])
+    assert p.returncode == 1 and "Traceback" not in p.stderr  # 1 = a target is missed (mock models only run the rules)
+    for needle in ("=== insurance", "=== banking", "=== Summary by set ===", "Results by sub-domain", "banking/retail/checking", "insurance/life/term"):
+        assert needle in p.stdout, needle
+    names = sorted(f.name for f in tmp_path.glob("eval_*.json"))
+    assert any(n.startswith("eval_insurance_") for n in names) and any(n.startswith("eval_banking_") for n in names)
+
+
+@pytest.mark.parametrize("args,expect", [
+    (["--set", "banking"], ["=== banking", "personal-loans"]),
+    (["--set", "insurance"], ["=== insurance", "homeowners"]),
+    (["--domain", "banking/retail/checking"], ["=== banking", "banking/retail/checking"]),
+    (["--domain", "insurance/life/term"], ["=== insurance"]),
+])
+def test_cli_evaluate_picks_the_set_of_the_family(tmp_path, args, expect):
+    p = _run_cli(["evaluate", *args, "--output-dir", str(tmp_path)])
+    assert "Traceback" not in p.stderr
+    for needle in expect:
+        assert needle in p.stdout, (args, needle)
+    other = "insurance" if "banking" in expect[0] else "banking"
+    assert f"=== {other}" not in p.stdout
+
+
+@pytest.mark.parametrize("args", [["--set", "telecom"], ["-r", "data/requirements/banking_requirements.json"]])
+def test_cli_evaluate_bad_set_or_incomplete_custom_run_exits_2(tmp_path, args):
+    p = _run_cli(["evaluate", *args, "--output-dir", str(tmp_path)])
+    assert p.returncode == 2 and "Traceback" not in p.stderr
+
+
+def test_cli_evaluate_custom_run_with_all_three_files(tmp_path):
+    p = _run_cli(["evaluate", "-r", "data/requirements/banking_requirements.json", "-a", "data/answer_key/banking_answer_key.json",
+                  "-b", "data/seeded_bad/banking_seeded_bad.json", "-d", "banking", "--output-dir", str(tmp_path)])
+    assert p.returncode == 1 and "=== custom" in p.stdout and "Traceback" not in p.stderr
+
+
+def test_banking_rules_floor_is_reported_per_defect_and_per_subdomain(tmp_path):
+    import json as _json
+    _run_cli(["evaluate", "--set", "banking", "--output-dir", str(tmp_path)])
+    rep = _json.loads(next(tmp_path.glob("eval_banking_*.json")).read_text(encoding="utf-8"))
+    assert rep["bad_cases"] == 33 and rep["good_cases"] == 17
+    assert set(rep["by_domain"]) >= {"banking/retail/checking", "banking/retail/savings", "banking/lending/personal-loans"}
+    assert rep["good_hard_rejected"] == 0
+    assert rep["defect_breakdown"]["missing_expected"]["caught"] == 2

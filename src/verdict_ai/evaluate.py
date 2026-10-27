@@ -54,6 +54,8 @@ class EvaluationReport:
     targets_met: bool
     models_used: list[str]
     gate_results: list[dict[str, Any]] = field(default_factory=list)
+    good_hard_rejected: int = 0  # good cases whose decision was reject (the rest of good_wrongly_rejected were revise or human_review)
+    by_domain: dict[str, dict[str, int]] = field(default_factory=dict)  # results per sub-domain (the requirement's domain path)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -109,11 +111,37 @@ def _build_evaluation_mock_router() -> ModelRouter:
     return EvalMockRouter()
 
 
+# One evaluator per domain family: its own requirements, good cases (answer key), seeded bad cases and domain pack.
+# The engine (rules, router, gate, report) is shared. To add a family, add its files and one entry here, then
+# add the pack under src/verdict_ai/domains/.
+EVAL_SETS: dict[str, dict[str, str]] = {
+    "insurance": {
+        "requirements": "data/requirements/insurance_requirements.json",
+        "answer_key": "data/answer_key/insurance_answer_key.json",
+        "seeded_bad": "data/seeded_bad/insurance_seeded_bad.json",
+        "domain": "insurance",
+    },
+    "banking": {
+        "requirements": "data/requirements/banking_requirements.json",
+        "answer_key": "data/answer_key/banking_answer_key.json",
+        "seeded_bad": "data/seeded_bad/banking_seeded_bad.json",
+        "domain": "banking",
+    },
+}
+
+
+def _print_progress(message: str) -> None:
+    """Live runs take minutes and call slow free models: say what is happening."""
+    import sys
+    from datetime import datetime
+    print(f"[{datetime.now():%H:%M:%S}] {message}", file=sys.stderr, flush=True)
+
+
 def run_evaluation(
     requirements_path: str | Path = "data/requirements/insurance_requirements.json",
     answer_key_path: str | Path = "data/answer_key/insurance_answer_key.json",
     seeded_bad_path: str | Path = "data/seeded_bad/insurance_seeded_bad.json",
-    domain: str = "insurance/life/term",
+    domain: str = "insurance",
     approve_threshold: float = 0.85,
     agent_mode: Literal["mock", "live"] = "mock",
     use_rules: bool = True,
@@ -176,7 +204,7 @@ def run_evaluation(
             router,
             OrchestratorConfig(batch_size=10, run_analyst=True, run_arbiter=True, resume_path=resume_path),
         )
-        run_res = orchestrator.run(reqs, all_cases, context=domain_ctx)
+        run_res = orchestrator.run(reqs, all_cases, context=domain_ctx, on_progress=_print_progress)
         checks = run_res.all_checks()
 
         for c in checks:
@@ -218,12 +246,15 @@ def run_evaluation(
 
     good_approved = 0
     good_wrongly_rejected = 0
+    good_hard_rejected = 0
     for gid in good_ids:
         res = result_map.get(gid)
         if res and res.decision == "approve":
             good_approved += 1
         else:
             good_wrongly_rejected += 1
+            if res and res.decision == "reject":
+                good_hard_rejected += 1
 
     false_reject_rate = (good_wrongly_rejected / len(good_ids)) if good_ids else 0.0
 
@@ -268,6 +299,27 @@ def run_evaluation(
         catch_rate >= 0.80 and false_reject_rate < 0.15 and reasons_compliance >= 0.99
     )
 
+    # Results per sub-domain, taken from the requirement each case belongs to.
+    req_domain = {r.id: (r.domain or "unassigned") for r in reqs}
+    by_domain: dict[str, dict[str, int]] = {}
+
+    def _bucket(case: Any) -> dict[str, int]:
+        key = req_domain.get(case.requirement_id, "unassigned (no such requirement)")
+        return by_domain.setdefault(key, {"good": 0, "good_not_approved": 0, "good_hard_rejected": 0, "bad": 0, "bad_caught": 0})
+
+    for case in good_cases:
+        row, res = _bucket(case), result_map.get(case.id)
+        row["good"] += 1
+        if not (res and res.decision == "approve"):
+            row["good_not_approved"] += 1
+        if res and res.decision == "reject":
+            row["good_hard_rejected"] += 1
+    for case in bad_cases:
+        row, res = _bucket(case), result_map.get(case.id)
+        row["bad"] += 1
+        if res and res.decision != "approve":
+            row["bad_caught"] += 1
+
     defect_dict = {
         k: {
             "defect": s.defect,
@@ -286,6 +338,8 @@ def run_evaluation(
         bad_cases=len(bad_cases),
         good_approved=good_approved,
         good_wrongly_rejected=good_wrongly_rejected,
+        good_hard_rejected=good_hard_rejected,
+        by_domain=by_domain,
         false_reject_rate=round(false_reject_rate, 4),
         bad_caught=bad_caught,
         bad_missed=bad_missed,
@@ -324,6 +378,16 @@ def format_markdown_report(report: EvaluationReport) -> str:
         f"| **False Reject Rate** | **{reject_pct:.1f}%** ({report.good_wrongly_rejected}/{report.good_cases}) | < 15.0% | {'PASS' if report.false_reject_rate < 0.15 else 'FAIL'} |",
         f"| **Reason Compliance** | **{reason_pct:.1f}%** | 100.0% | {'PASS' if report.reasons_compliance >= 0.99 else 'FAIL'} |",
         "",
+        f"> False Reject Rate counts every good case that was not approved (revise, human review or reject). "
+        f"Hard rejects among them: **{report.good_hard_rejected}/{report.good_cases}**.",
+        "",
+        "## Results by sub-domain",
+        "",
+        "| Sub-domain | Bad cases caught | Good cases not approved | Good cases hard-rejected |",
+        "|---|---|---|---|",
+        *[f"| `{name}` | {row['bad_caught']}/{row['bad']} | {row['good_not_approved']}/{row['good']} | {row['good_hard_rejected']}/{row['good']} |"
+          for name, row in sorted(report.by_domain.items())],
+        "",
         "## Defect Breakdown",
         "",
         "| Defect Type | Total | Caught | Missed | Catch Rate |",
@@ -350,14 +414,16 @@ def format_markdown_report(report: EvaluationReport) -> str:
 def save_evaluation(
     report: EvaluationReport,
     output_dir: str | Path = "runs",
+    name: str = "",
 ) -> tuple[Path, Path]:
     """Save evaluation JSON artifact and Markdown report to output directory."""
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
     slug = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    json_path = out / f"eval_{slug}.json"
-    md_path = out / f"eval_{slug}.md"
+    prefix = f"eval_{name}_" if name else "eval_"
+    json_path = out / f"{prefix}{slug}.json"
+    md_path = out / f"{prefix}{slug}.md"
 
     json_path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
     md_path.write_text(format_markdown_report(report), encoding="utf-8")

@@ -175,5 +175,28 @@ def test_invalid_reply_is_not_cached(tmp_path):
         t1, _ = router.chat("analyst", msgs, validate=is_json)
         t2, _ = router.chat("analyst", msgs, validate=is_json)
         t3, _ = router.chat("analyst", msgs, validate=is_json)
-    assert (t1, t2, t3) == ("garbage", '{"ok": 1}', '{"ok": 1}')
-    assert post_mock.call_count == 2  # bad reply re-asked; good reply cached
+    assert (t1, t2, t3) == ('{"ok": 1}',) * 3  # garbage fails over to the next model
+    assert post_mock.call_count == 2  # good reply cached, garbage never replayed
+
+
+def test_chat_fails_over_on_empty_reply():
+    from verdict_ai.agents._common import reply_is_valid
+    from verdict_ai.llm import MockModel
+
+    router = MockModel("").as_router("arbiter")
+    router.roles_config = {"arbiter": {"models": ["a", "b"]}}
+    replies = {"a": "", "b": '[{"case_id": "x"}]'}
+    router._post = lambda model, messages: replies[model]
+    text, model = router.chat("arbiter", [{"role": "user", "content": "q"}], validate=reply_is_valid)
+    assert model == "b" and text.startswith("[")
+
+
+def test_200_without_choices_fails_over(tmp_path):
+    router = _router(tmp_path)
+    bad = MagicMock()
+    bad.status_code = 200
+    bad.text = '{"error": {"message": "rate limited"}}'
+    bad.json.return_value = {"error": {"message": "rate limited"}}
+    with patch("httpx.Client.post", side_effect=[bad, _ok_resp("[]")]):
+        text, _ = router.chat("analyst", [{"role": "user", "content": "x"}])
+    assert text == "[]"

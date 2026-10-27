@@ -42,11 +42,14 @@ Return a JSON array — one object per case:
   }}
 ]
 
+Judge each case on its own. A case does not have to cover the whole requirement: other cases cover
+the rest. Do not lower the score because a case tests only one rule, one boundary or one combination.
+
 Scoring guide:
-- 1.0  Scenario is clear, expected result is specific and measurable, fully covers req.
+- 1.0  Scenario matches the requirement; expected result is specific and measurable.
 - 0.85 Minor wording issue but testable.
-- 0.70 Partially covers requirement or expected result is borderline vague.
-- 0.50 Scenario does not match requirement intent or expected result is untestable.
+- 0.70 Expected result is borderline vague, or one part of the case is unclear.
+- 0.50 Scenario does not match the requirement, contradicts it, or the expected result is untestable.
 - 0.0  Completely wrong or missing.
 
 Flag: vague expected results, wrong requirement scope, untestable outcomes,
